@@ -6,12 +6,15 @@ from .models import Snapshots,SnapshotTags
 from .models import ProcessingVersions
 from .forms import SnapshotForm,ProcessingVersionsForm
 from .forms import EditProcessingVersionsForm
+from .forms import SnapshotTagsForm
 
 
 def index(request):
     snapshots = Snapshots.objects.all().order_by("insert_time")
     processing_versions = ProcessingVersions.objects.all().order_by("validity_start")
-    context = {"snapshots": snapshots, "processing_versions": processing_versions}
+    snapshot_tags = SnapshotTags.objects.all().order_by("insert_time")
+    
+    context = {"snapshots": snapshots, "processing_versions": processing_versions, "snapshot_tags": snapshot_tags}
     print(context)
     return render(request, "snapshots_index.html", context)
 
@@ -86,3 +89,27 @@ def edit_processing_version(request):
 
     return render(request, "edit_processing_version.html", {"form": form})
 
+def create_new_snapshot_tag(request):
+    
+    if request.method == "POST":
+        # create a form instance and populate it with data from the request:
+        form = SnapshotTagsForm(request.POST)
+        # check whether it's valid:
+        if form.is_valid():
+            # process the data in form.cleaned_data as required
+            name = form.cleaned_data["name"]
+            snapshot_name = form.cleaned_data["snapshot_name"]
+            s = Snapshots.objects.get(name=snapshot_name)
+            st = SnapshotTags(name=name, insert_time=datetime.datetime.now(tz=datetime.timezone.utc))
+            st.snapshot_name = s
+            st.save()
+            
+            # redirect to a new URL:
+            return redirect("./index")
+ 
+        # if a GET (or any other method) we'll create a blank form
+    else:
+
+        form = SnapshotTagsForm()
+
+    return render(request, "create_new_snapshot_tag.html", {"form": form})

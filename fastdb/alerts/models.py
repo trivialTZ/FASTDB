@@ -4,6 +4,7 @@ import django.contrib.postgres.indexes as indexes
 from django.utils import timezone
 from psqlextra.types import PostgresPartitioningMethod
 from psqlextra.models import PostgresPartitionedModel
+import uuid
 
 # Support the Q3c Indexing scheme
 
@@ -17,7 +18,7 @@ class ProcessingVersions(models.Model):
         db_table = 'processing_versions'
 
     version = models.TextField(db_comment="Processing version", primary_key=True)
-    validity_start = models.DateTimeField(auto_now_add=True, db_comment="Time when validity of this processing version starts")
+    validity_start = models.DateTimeField(db_comment="Time when validity of this processing version starts")
     validity_end = models.DateTimeField(null=True, blank=True, db_comment="Time when validity of this processing version ends")
 
 
@@ -43,6 +44,9 @@ class Snapshots(models.Model):
     insert_time =  models.DateTimeField(default=timezone.now)
 
 
+    def __str__(self):
+       return self.name
+   
 class DiaObject(models.Model):
 
     class Meta:
@@ -98,9 +102,10 @@ class DiaSource(PostgresPartitionedModel):
         method = PostgresPartitioningMethod.LIST
         key = ['processing_version']
 
-    dia_source = models.BigIntegerField(db_comment="diaSourceId from Alert stream", primary_key=True)
+    uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    dia_source = models.BigIntegerField(db_comment="diaSourceId from Alert stream")
     ccd_visit_id = models.BigIntegerField(db_comment="ccdVisitId from PPDB", null=True)
-    dia_object = models.ForeignKey(DiaObject, on_delete=models.RESTRICT, related_name='dia_obj_s')
+    dia_object = models.ForeignKey(DiaObject, on_delete=models.RESTRICT, related_name='dia_obj_s', db_column='dia_object')
     parent_dia_source_id = models.BigIntegerField(null=True, db_comment="parentdiaSourceId from PPDB", db_column='parent_dia_source_id')
     season = models.IntegerField(db_comment='Season when this object appears - filled from DiaObject')
     fake_id = models.IntegerField(db_comment='ID to indicate fake SN, fake = integer, real = 0  - filled from DiaObject', null=True)
@@ -128,12 +133,13 @@ class DiaForcedSource(PostgresPartitionedModel):
         method = PostgresPartitioningMethod.LIST
         key = ['processing_version']
 
-    dia_forced_source = models.BigIntegerField(db_comment="diaForcedSourceId from PPDB", primary_key=True)
+    uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    dia_forced_source = models.BigIntegerField(db_comment="diaForcedSourceId from PPDB")
     ccd_visit_id = models.BigIntegerField(db_comment="ccdVisitId from PPDB", null=True)
-    dia_object = models.ForeignKey(DiaObject, on_delete=models.RESTRICT, related_name='dia_obj_fs')
+    dia_object = models.ForeignKey(DiaObject, on_delete=models.RESTRICT, related_name='dia_obj_fs', db_column='dia_object')
     season = models.IntegerField(db_comment='Season when this object appears - filled from DiaObject')
     fake_id = models.IntegerField(db_comment='ID to indicate fake SN, fake = integer, real = 0  - filled from DiaObject', null=True)
-    mid_point_tai = models.FloatField(db_comment="midPointTai from PPDB")
+    mid_point_tai = models.FloatField(db_comment="midPointTai from PPDB", null=True)
     filter_name = models.TextField(db_comment="CcdVisit.filterName from PPDB")
     ps_flux = models.FloatField(db_comment="psFlux from PPDB")
     ps_flux_err = models.FloatField(db_comment="psFluxErr from PPDB")

@@ -1,4 +1,5 @@
 from django import forms
+from .models import Snapshots
 
 
 class SnapshotForm(forms.Form):
@@ -14,3 +15,6 @@ class EditProcessingVersionsForm(forms.Form):
     validity_end = forms.DateTimeField(label="Valid End Date")
 
 
+class SnapshotTagsForm(forms.Form):
+    name =  forms.CharField(label="Tag name", max_length=20)
+    snapshot_name = forms.ModelChoiceField(label="Available Snapshots", queryset=Snapshots.objects.filter().only('name'))
