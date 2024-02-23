@@ -104,6 +104,33 @@ tr:nth-child(even) {
     <li><a href="./create_new_processing_version">Create New Processing Version</a></li>
   </ul>
 
+
+  <h2>Views</h2>
+  {% if db_views %}
+  <table>
+    <thead>
+      <tr>
+	<th>View Name</th>
+	<th>SQL</th>
+	<th>Creation Date</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for v in db_views %}
+      <tr>
+	<td>{{ v.view_name }}</td>
+	<td>{{ v.view_sql }}</td>
+	<td>{{ v.insert_time }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p>No Views are available.</p>
+  {% endif %}
+
+  <ul>
+    <li><a href="./create_new_view">Create New View</a></li>
   
 </body>
     

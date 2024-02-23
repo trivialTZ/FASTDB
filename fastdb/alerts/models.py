@@ -52,6 +52,12 @@ class DiaObject(models.Model):
     class Meta:
         app_label = 'alerts'
         db_table = 'dia_object'
+        indexes = [
+            models.Index(fields=["dia_object"]),
+            models.Index(fields=["season"]),
+            models.Index(fields=["dia_object","season"]),
+        ]
+
 
     dia_object = models.BigIntegerField(primary_key=True, db_comment="diaObjectId from PPDB")
     dia_object_iau_name = models.TextField(db_comment="IAU Name", null=True)
@@ -97,6 +103,10 @@ class DiaSource(PostgresPartitionedModel):
         app_label = 'alerts'
         db_table = 'dia_source'
         constraints = [models.UniqueConstraint(fields=['processing_version','dia_source'],name='unique_pv_dia_source')]
+        indexes = [
+            models.Index(fields=["dia_object"]),
+            models.Index(fields=["dia_source"]),
+        ]
 
     class PartitioningMeta:
         method = PostgresPartitioningMethod.LIST
@@ -118,6 +128,7 @@ class DiaSource(PostgresPartitionedModel):
     snr = models.FloatField(db_comment="snr from PPDB" )
     processing_version =  models.TextField(db_comment="Local copy of Processing version key to circumvent Django")
     broker_count = models.IntegerField(db_comment="Number of brokers that alerted on this source")
+    valid_flag =  models.IntegerField(db_comment='Valid data flag', default=1)
     insert_time =  models.DateTimeField(default=timezone.now)
 
 
@@ -128,6 +139,11 @@ class DiaForcedSource(PostgresPartitionedModel):
         app_label = 'alerts'
         db_table = 'dia_forced_source'
         constraints = [models.UniqueConstraint(fields=['processing_version','dia_forced_source'],name='unique_pv_dia_forced_source')]
+        indexes = [
+            models.Index(fields=["dia_object"]),
+            models.Index(fields=["dia_forced_source"]),
+        ]
+
         
     class PartitioningMeta:
         method = PostgresPartitioningMethod.LIST
@@ -144,6 +160,7 @@ class DiaForcedSource(PostgresPartitionedModel):
     ps_flux = models.FloatField(db_comment="psFlux from PPDB")
     ps_flux_err = models.FloatField(db_comment="psFluxErr from PPDB")
     processing_version =  models.TextField(db_comment="Local copy of Processing version key to circumvent Django")
+    valid_flag =  models.IntegerField(db_comment='Valid data flag', default=1)
     insert_time =  models.DateTimeField(default=timezone.now)
 
 
@@ -162,6 +179,7 @@ class DStoPVtoSS(PostgresPartitionedModel):
     processing_version =  models.TextField(db_comment="Local copy of Processing version key to circumvent Django")
     snapshot_name = models.TextField(db_comment="Local copy of snapshot_name key to circumvent Django")
     dia_source = models.BigIntegerField(db_comment="Local copy of dia_source to circumvent Django")
+    valid_flag = models.IntegerField(db_comment='Valid data flag', default=1)
     insert_time =  models.DateTimeField(default=timezone.now)
         
 
@@ -180,6 +198,7 @@ class DFStoPVtoSS(PostgresPartitionedModel):
     processing_version =  models.TextField(db_comment="Local copy of Processing version to circumvent Django")
     snapshot_name = models.TextField(db_comment="Local copy of snapshot_name to circumvent Django")
     dia_forced_source = models.BigIntegerField(db_comment="Local copy of dia_source to circumvent Django")
+    valid_flag = models.IntegerField(db_comment='Valid data flag', default=1)
     insert_time =  models.DateTimeField(default=timezone.now)
     
 # Broker information
@@ -253,6 +272,13 @@ class BrokerClassification(PostgresPartitionedModel):
     classifications = models.JSONField(db_index=True, null=True)
     insert_time =  models.DateTimeField(default=timezone.now)
 
+class DBViews(models.Model):
 
+    class Meta:
+        app_label = 'alerts'
+        db_table = 'db_views'
 
+    view_name = models.TextField(db_comment="Name for view", null=True)
+    view_sql = models.TextField(db_comment="SQL for view", null=True)
+    insert_time =  models.DateTimeField(default=timezone.now)
 

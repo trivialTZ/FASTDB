@@ -16,8 +16,12 @@ urlpatterns = [
     path("get_dia_objects", Data.get_dia_objects, name="get_dia_objects"),
     path("acquire_token",Data.acquire_token, name="acquire_token"),
     path('api-token-auth/', views.obtain_auth_token),
-    path('raw_query',Data.raw_query, name="raw_query"),
+    path('raw_query_long',Data.raw_query_long, name="raw_query_long"),
+    path('raw_query_short',Data.raw_query_short, name="raw_query_short"),
     path('store_dia_source_data',Data.store_dia_source_data, name="store_dia_source_data"),
     path('store_ds_pv_ss_data',Data.store_ds_pv_ss_data, name="store_ds_pv_ss_data"),
+    path('update_ds_pv_ss_valid_flag',Data.update_ds_pv_ss_valid_flag, name="update_ds_pv_ss_valid_flag"),
+    path('update_dia_source_valid_flag',Data.update_dia_source_valid_flag, name="update_dia_source_valid_flag"),
+    path('create_new_view', Snapshots.create_new_view, name="create_new_view"),
 ]
 

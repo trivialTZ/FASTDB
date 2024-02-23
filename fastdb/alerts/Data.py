@@ -1,5 +1,8 @@
 import datetime
 import json
+import os
+import psycopg2
+from time import sleep
 
 from alerts.models import LastUpdateTime, ProcessingVersions, HostGalaxy, Snapshots, DiaObject, DiaSource, DiaForcedSource,SnapshotTags
 from alerts.models import DStoPVtoSS, DFStoPVtoSS, BrokerClassifier, BrokerClassification
@@ -31,6 +34,8 @@ from django.middleware.csrf import get_token
 
 from django.db import connection
 
+from multiprocessing import Process
+
 import secrets
 from http import cookies
 import uuid
@@ -59,11 +64,34 @@ def get_dia_sources(request):
 @api_view(['POST'])
 @authentication_classes([TokenAuthentication])
 @permission_classes([IsAuthenticated])
-def raw_query(request):
+def raw_query_long(request):
 
     print(request.user)
     if not request.user.is_authenticated:
-        return Response(serializer.error, status=HTTP_403_FORBIDDEN)
+        return Response(serializer.error, status=status.HTTP_403_FORBIDDEN)
+
+    raw_data = json.loads(request.body)
+    data = json.loads(raw_data)
+
+    for d in data:
+        print(data)
+        if 'query' in d:
+            query = d['query']
+
+    p = Process(target=raw_query_process, args=(query,))
+    p.start()
+
+    status = 'Query started'
+    return Response(status)
+
+@api_view(['POST'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def raw_query_short(request):
+
+    print(request.user)
+    if not request.user.is_authenticated:
+        return Response(serializer.error, status=status.HTTP_403_FORBIDDEN)
 
     raw_data = json.loads(request.body)
     data = json.loads(raw_data)
@@ -79,6 +107,17 @@ def raw_query(request):
     
     return Response(json_data)
 
+@api_view(['POST'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def authenticate_user(request):
+
+    print(request.user)
+    if not request.user.is_authenticated:
+        return Response(serializer.error, status=status.HTTP_403_FORBIDDEN)
+    else:
+        status = 'User %s authenticated'
+        return Response(status, status=status.HTTP_200_OK)
 
 def dictfetchall(cursor):
     "Return all rows from a cursor as a dict"
@@ -237,10 +276,78 @@ def store_ds_pv_ss_data(request):
         print(data)
         dspvss = DStoPVtoSS(dia_source=data['dia_source'])
         dspvss.processing_version = data['processing_version']
-        dspvss.snapshot_name = data['snapshot']
+        dspvss.snapshot_name = data['snapshot_name']
+        dspvss.valid_flag = data['valid_flag']
         dspvss.insert_time =  datetime.datetime.now(tz=datetime.timezone.utc)
     
         dspvss.save()
 
         status = '%d Rows of Data stored' % count
     return Response(status)
+
+@api_view(['POST'])
+def update_ds_pv_ss_valid_flag(request):
+
+    if not request.user.is_authenticated:
+        return Response(serializer.error, status=HTTP_403_FORBIDDEN)
+
+    raw_data = json.loads(request.body)
+    data = json.loads(raw_data)
+    for d in data:
+        if 'query' in d:
+             ds_pv_ss_data = d['query']
+    count = len(ds_pv_ss_data)
+
+    cursor = connection.cursor()
+
+    for data in ds_pv_ss_data:
+
+        query = "update ds_to_pv_to_ss set valid_flag = %d where dia_source = %d and processing_version = '%s' and snapshot_name = '%s'" % (data['valid_flag'],data['dia_source'],data['processing_version'],data['snapshot_name'])
+        cursor.execute(query)
+
+        status = '%d Rows of Data stored' % count
+    return Response(status)
+
+@api_view(['POST'])
+def update_dia_source_valid_flag(request):
+
+    if not request.user.is_authenticated:
+        return Response(serializer.error, status=HTTP_403_FORBIDDEN)
+
+    raw_data = json.loads(request.body)
+    data = json.loads(raw_data)
+    for d in data:
+        if 'query' in d:
+             dia_source_data = d['query']
+    count = len(dia_source_data)
+
+    cursor = connection.cursor()
+
+    for data in dia_source_data:
+
+        query = "update dia_source set valid_flag = %d where dia_source = %d and processing_version = '%s'" % (data['valid_flag'],data['dia_source'],data['processing_version'])
+        cursor.execute(query)
+
+        status = '%d Rows of Data stored' % count
+    return Response(status)
+
+def raw_query_process(query):
+
+    secret = os.environ['FASTDB_READER_PASSWORD']
+    conn_string = "host='fastdb-fastdb-psql' dbname='fastdb' user='fastdb_reader' password='%s'" % secret.strip()
+    print("Connecting to database %s" % conn_string)
+    conn = psycopg2.connect(conn_string)
+    
+    cursor = conn.cursor()
+    print("Connected")
+
+    print(query)
+
+    cursor.execute(query)
+    json_data = dictfetchall(cursor)
+
+    sleep(60)
+    print(json_data)
+
+    cursor.close()
+    conn.close()
