@@ -1,4 +1,5 @@
 from django.shortcuts import render
+from django.template.loader import render_to_string
 from django.shortcuts import redirect
 import datetime
 import psycopg2
@@ -10,8 +11,10 @@ from .forms import SnapshotForm,ProcessingVersionsForm
 from .forms import EditProcessingVersionsForm
 from .forms import SnapshotTagsForm
 from .forms import CreateViewForm
+from django.conf import settings
 
 from django.db import connection
+from django.db.migrations.recorder import MigrationRecorder
 
 
 def index(request):
@@ -58,6 +61,39 @@ def create_new_processing_version(request):
             validity_start = form.cleaned_data["validity_start"]
             pv = ProcessingVersions(version=version, validity_start=validity_start)
             pv.save()
+
+            # Create migration to create new partitions for dia_source, dia_forced_source, ds_to_pv_to_ss,
+            # dfs_to_pv_to_ss
+
+            # Get the most recent migration from the database
+
+            lm = MigrationRecorder.Migration.objects.filter(app='alerts').last()
+            nm = lm.name
+            parts = nm.split('_')
+            mig_num = str(int(parts[0])+1)
+            mig_num = mig_num.rjust(4,'0')
+
+            # Construct migration file name
+            
+            mig_name = "%s_partitioning_%s.py" % (mig_num,version)
+            base_dir = settings.BASE_DIR
+            mig_file = "%s/alerts/migrations/%s" % (base_dir,mig_name)
+
+            # Fill template
+            
+            mig_template =  "%s/alerts/templates/migration_template.txt" % (base_dir)
+            mig_dict = {}
+            mig_dict['depend'] = nm
+            mig_dict['name'] = "pv_%s" % version
+            mig_dict['version'] = version
+            rendered = render_to_string(mig_template, mig_dict)
+
+            # Save output as .py file in migrations directory
+            
+            mig_file_out = open(mig_file, 'w+')
+            mig_file_out.write(rendered)
+            mig_file_out.close()
+
             
             # redirect to a new URL:
             return redirect("./index")
