@@ -21,11 +21,10 @@ fastdbap.init_interval = window.setInterval(
                 fastdbap.started = true;
                 window.clearInterval( fastdbap.init_interval );
                 renderer = new fastdbap.Context();
-                renderer.getUser( function( software_revision ) { renderer.renderpage( software_revision ); } );
+                renderer.init();
             }
         }
     },
     100);
 
 export { }
-(END)

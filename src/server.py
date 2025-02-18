@@ -1,13 +1,43 @@
+import logging
+import uuid
+from types import SimpleNamespace
+
+from contextlib import contextmanager
 
 import simplejson
 import psycopg2
-import psycopg2.extras
 
 import flask
 import flask_session
 import flask.views
 
+import rkauth_flask
+
+# ======================================================================
+# Global config
+
 import apconfig
+with open( apconfig.secretkeyfile ) as ifp:
+    _flask_session_secret_key = ifp.readline().strip()
+with open( apconfig.dbpasswdfile ) as ifp:
+    _dbpasswd = ifp.readline().strip()
+_dbhost = apconfig.dbhost
+_dbport = apconfig.dbport
+_dbuser = apconfig.dbuser
+_dbname = apconfig.dbdatabase
+
+
+# ======================================================================
+# UUID encoder for simplejson
+
+class UUIDJSONEncoder( simplejson.JSONEncoder ):
+    def default( self, obj ):
+        if isinstance( obj, uuid.UUID ):
+            return str(obj)
+        else:
+            return super().default( obj )
+
+
 
 # ======================================================================
 
@@ -17,16 +47,41 @@ class BaseView( flask.views.View ):
     def __init__( self, *args, **kwargs ):
         super().__init__( *args, **kwargs )
 
+    @contextmanager
+    def dbcon( self, conn=None ):
+        global _dbhost, _dbport, _dbuser, _dbpasswd, _dbname
+
+        if conn is not None:
+            yield conn
+            return
+        else:
+            conn = psycopg2.connect( host=_dbhost, port=_dbport, dbname=_dbname, user=_dbuser, password=_dbpasswd )
+            yield conn
+            conn.rollback()
+            conn.close()
+
+
     def check_auth( self ):
         self.username = flask.session['username'] if 'username' in flask.session else '(None)'
         self.displayname = flask.session['userdisplayname'] if 'userdisplayname' in flask.session else '(None)'
         self.authenticated = ( 'authenticated' in flask.session ) and flask.session['authenticated']
         self.user = None
         if self.authenticated:
-            self.user = self.session.query( AuthUser ).filter( AuthUser.username==self.username ).first()
-            if self.user is None:
-                self.authenticated = False
-                raise ValueError( f"Error, failed to find user {self.username} in database" )
+            with self.dbcon() as conn:
+                cursor = conn.cursor()
+                cursor.execute( "SELECT id,username,displayname,email FROM authuser WHERE username=%(username)s",
+                                {'username': self.username } )
+                rows = cursor.fetchall()
+                if len(rows) > 1:
+                    self.authenticated = False
+                    raise RuntimeError( f"Error, more than one {self.username} in database, "
+                                        f"this should never happen." )
+                if len(rows) == 0:
+                    self.authenticated = False
+                    raise ValueError( f"Error, failed to find user {self.username} in database" )
+                row = rows[0]
+                self.user = SimpleNamespace( id=row[0], username=row[1], displayname=row[2], email=row[3] )
+                # Verify that session displayname and database displayname match?  Eh.  Whatevs.
         return self.authenticated
 
     def dispatch_request( self, *args, **kwargs ):
@@ -60,7 +115,7 @@ class BaseView( flask.views.View ):
 
 class MainPage( BaseView ):
     def dispatch_request( self ):
-        return flask.render_template( "flaskdb_webap.html" )
+        return flask.render_template( "fastdb_webap.html" )
 
 
 # **********************************************************************
@@ -68,17 +123,13 @@ class MainPage( BaseView ):
 # **********************************************************************
 # Configure and create the web app in global variable "app"
 
-with open( apconfig.secretkeyfile ) as ifp:
-    secret_key = ifp.readline().strip()
-with open( apconfig.dbpasswdfile ) as ifp:
-    dbpasswd = ifp.readline().strip()
 
 app = flask.Flask(  __name__ )
 # app.logger.setLevel( logging.INFO )
 app.logger.setLevel( logging.DEBUG )
 
 app.config.from_mapping(
-    SECRET_KEY=secret_key,
+    SECRET_KEY=_flask_session_secret_key,
     SESSION_COOKIE_PATH='/',
     SESSION_TYPE='filesystem',
     SESSION_PERMANENT=True,
@@ -90,12 +141,12 @@ app.config.from_mapping(
 server_session = flask_session.Session( app )
 
 rkauth_flask.RKAuthConfig.setdbparams(
-    db_host=apconfig.dbhost,
-    db_port=apconfig.dbport,
-    db_name=apconfig.dbdatabase
-    db_user=apconfig.dbuser
-    db_password=dbpasswd,
-    email_from = apconfig.emailfrom
+    db_host=_dbhost,
+    db_port=_dbport,
+    db_name=_dbname,
+    db_user=_dbuser,
+    db_password=_dbpasswd,
+    email_from = apconfig.emailfrom,
     email_subject = 'fastdb password reset',
     email_system_name = 'fastdb',
     smtp_server = apconfig.smtpserver,
@@ -121,4 +172,3 @@ for url, cls in urls.items():
         name = f'{url}.{usedurls[url]}'
 
     app.add_url_rule (url, view_func=cls.as_view(name), methods=['GET', 'POST'], strict_slashes=False )
-

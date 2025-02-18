@@ -11,6 +11,11 @@
 
 # Test install location
 install/webap
+install/sessions
+!install/sessions/.placeholder
+
+# Env file
+/.env
 
 # Emacs backup files
 **~

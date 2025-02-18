@@ -1,8 +1,6 @@
-BEGIN;
-
 -- Tables used for the rkauth system
 CREATE TABLE authuser(
-  id UUID NOT NULL,
+  id UUID NOT NULL DEFAULT gen_random_uuid(),
   username text NOT NULL,
   displayname text NOT NULL,
   email text NOT NULL,
@@ -38,7 +36,7 @@ CREATE INDEX idx_processingversion_desc ON processingversion(description);
 CREATE TABLE snapshot(
   id INTEGER PRIMARY KEY,
   description text,
-  creation_time timestamp with time zone DEFAULT NOW(),
+  creation_time timestamp with time zone DEFAULT NOW()
 );
 CREATE INDEX idx_snapshot_desc ON snapshot(description);
 
@@ -53,16 +51,16 @@ CREATE INDEX idx_snapshot_desc ON snapshot(description);
 --   TODO : a table that collects together
 --   diaobjects and identifies them all as
 --   the same thing
-CREATE TABLE diaboject(
-  id UUID PRIMARY KEY NOT NULL DEFAULT get_random_uuid(),
+CREATE TABLE diaobject(
+  id UUID PRIMARY KEY NOT NULL DEFAULT gen_random_uuid(),
   processing_version integer NOT NULL,
   diaobjectid bigint NOT NULL,
   radecmjdtai real,
   validitystart timestamp with time zone,
   validityend timestamp with time zone,
-  ra double NOT NULL,
+  ra double precision NOT NULL,
   raerr real,
-  dec double NOT NULL,
+  dec double precision NOT NULL,
   decerr real,
   ra_dec_cov real,
   nearbyextobj1 integer,
@@ -87,7 +85,7 @@ CREATE INDEX idx_diaobject_q3c ON diaobject (q3c_ang2ipix(ra, dec));
 CREATE INDEX idx_diaobject_diaobjectid ON diaobject(diaobjectid);
 CREATE INDEX idx_diaobject_procver ON diaobject(processing_version);
 ALTER TABLE diaobject ADD CONSTRAINT fk_diaobject_procver
-  FOREIGN KEY processing_version REFERENCES processing_Version(id) ON DELETE RESTRICT;
+  FOREIGN KEY (processing_version) REFERENCES processingversion(id) ON DELETE RESTRICT;
 
 -- Selected from DiaSource APDB table
 -- Flags converted to the flags bitfield:
@@ -128,6 +126,7 @@ ALTER TABLE diaobject ADD CONSTRAINT fk_diaobject_procver
 CREATE TABLE diasource(
   diasourceid bigint NOT NULL,
   processing_version integer NOT NULL,
+  diaobjectuuid UUID,
   diaobjectid bigint,
   ssobjectid bigint,
   visit integer NOT NULL,
@@ -139,18 +138,18 @@ CREATE TABLE diasource(
   x_y_cov real,
 
   band char NOT NULL,
-  midpointmjdtai double NOT NULL,
-  ra double NOT NULL,
+  midpointmjdtai double precision NOT NULL,
+  ra double precision NOT NULL,
   raerr real,
-  dec double NOT NULL
+  dec double precision NOT NULL,
   decerr real,
   ra_dec_cov real,
 
   psfflux real NOT NULL,
   psffluxerr real NOT NULL,
-  psfra double,
+  psfra double precision,
   psfraerr real,
-  psfdec double,
+  psfdec double precision,
   psfdecerr real,
   psfra_psfdec_cov real,
   psfflux_psfra_cov real,
@@ -172,7 +171,7 @@ CREATE TABLE diasource(
   
   ixx real,
   ixxerr real,
-  iyy real
+  iyy real,
   iyyerr real,
   ixy real,
   ixyerr real,
@@ -189,30 +188,31 @@ CREATE TABLE diasource(
   PRIMARY KEY (diasourceid, processing_version)
 )
 PARTITION BY LIST (processing_version);
+CREATE INDEX idx_diasource_id ON diasource(diasourceid);
 CREATE INDEX idx_diasource_q3c ON diasource (q3c_ang2ipix(ra, dec));
-CREATE INDEX idx_diasource_visit ON diasource(visit):
-CREATE INDEX idx_diasource_detector ON diasource(detector):
-CREATE INDEX idx_diasource_band ON diasource(band):
-CREATE INDEX idx_diasource_mjd ON diasource(midpointmjdtai):
-CREATE INDEX idx_diasource_diaobjectid ON diasource(diaobjectid):
+CREATE INDEX idx_diasource_visit ON diasource(visit);
+CREATE INDEX idx_diasource_detector ON diasource(detector);
+CREATE INDEX idx_diasource_band ON diasource(band);
+CREATE INDEX idx_diasource_mjd ON diasource(midpointmjdtai);
+CREATE INDEX idx_diasource_diaobjectid ON diasource(diaobjectuuid);
 ALTER TABLE diasource ADD CONSTRAINT fk_diasource_diaobjectid
-   FOREIGN KEY diaobjectid REFERENCES diaobject(diaobjectid) ON DELETE CASCADE;
+  FOREIGN KEY (diaobjectuuid) REFERENCES diaobject(id) ON DELETE CASCADE;
 CREATE INDEX idx_diasource_procver ON diasource(processing_version);
 ALTER TABLE diasource ADD CONSTRAINT fk_diasource_procver
-   FOREIGN KEY processing_version REFERENCES processing_version(id) ON DELETE RESTRICT;
+  FOREIGN KEY (processing_version) REFERENCES processingversion(id) ON DELETE RESTRICT;
   
 
 -- Selected from DiaForcedSource APDB table
 CREATE TABLE diaforcedsource (
   diaforcedsourceid bigint NOT NULL,
+  diaobjectuuid UUID NOT NULL,
   processing_version integer NOT NULL,
   visit integer NOT NULL,
   detector smallint NOT NULL,
-  diaobjectid bigint NOT NULL,
-  midpointmjdtai double NOT NULL,
+  midpointmjdtai double precision NOT NULL,
   band char NOT NULL,
-  ra double NOT NULL,
-  dec double NOT NULL,
+  ra double precision NOT NULL,
+  dec double precision NOT NULL,
   psfflux real NOT NULL,
   psffluxerr real NOT NULL,
   scienceflux real NOT NULL,
@@ -223,16 +223,17 @@ CREATE TABLE diaforcedsource (
   PRIMARY KEY (diaforcedsourceid, processing_version)
 )
 PARTITION BY LIST (processing_version);
-CREATE INDEX idx_diaforcedsource_q3c ON diaforcedsource (q3c_ang2pix(ra, dec));
+CREATE INDEX idx_diaforcedsource_id ON diaforcedsource(diaforcedsourceid);
+CREATE INDEX idx_diaforcedsource_q3c ON diaforcedsource (q3c_ang2ipix(ra, dec));
 CREATE INDEX idx_diaforcedsource_visit ON diaforcedsource(visit);
 CREATE INDEX idx_diaforcedsource_detector ON diaforcedsource(detector);
 CREATE INDEX idx_diaforcedsource_mjdtai ON diaforcedsource(midpointmjdtai);
 CREATE INDEX idx_diaforcedsource_band ON diaforcedsource(band);
 ALTER TABLE diaforcedsource ADD CONSTRAINT fk_diaforcedsource_diaobjectid
-  FOREIGN KEY diaobjectid REFERENCES diaobject(diaobjectid) ON DELETE CASCADE;
+  FOREIGN KEY (diaobjectuuid) REFERENCES diaobject(id) ON DELETE CASCADE;
 CREATE INDEX idx_diaforcedsource_procver ON diaforcedsource(processing_version);
 ALTER TABLE diaforcedsource ADD CONSTRAINT fk_diaforcedsource_procver
-  FOREIGN KEY processing_version REFERENCES processing_verson(id) ON DELETE RESTRICT;
+  FOREIGN KEY (processing_version) REFERENCES processingversion(id) ON DELETE RESTRICT;
 
 
 
@@ -243,9 +244,14 @@ CREATE TABLE diasource_snapshot(
   PRIMARY KEY( diasourceid, processing_version, snapshot)
 )
 PARTITION BY LIST (processing_version);
-CREATE INDEX ix_dsss_diasourceid ON diasource_snapshot(diasourceid);
-CREATE INDEX ix_dsss_processing_version ON diasource_snapshot(processing_version);
+CREATE INDEX ix_dsss_diasource ON diasource_snapshot(diasourceid,processing_version);
 CREATE INDEX ix_dsss_snapshot ON diasource_snapshot(snapshot);
+ALTER TABLE diasource_snapshot ADD CONSTRAINT fk_diasource_snapshot_source
+  FOREIGN KEY (diasourceid, processing_version) REFERENCES diasource(diasourceid, processing_version)
+  ON DELETE CASCADE;
+ALTER TABLE diasource_snapshot ADD CONSTRAINT fk_diasource_snapshot_snapshot
+  FOREIGN KEY (snapshot) REFERENCES snapshot(id) ON DELETE CASCADE;
+
 
 
 CREATE TABLE diaforcedsource_snapshot(
@@ -255,8 +261,17 @@ CREATE TABLE diaforcedsource_snapshot(
   PRIMARY KEY( diaforcedsourceid, processing_version, snapshot)
 )
 PARTITION BY LIST (processing_version);
-CREATE INDEX ix_dfsss_diaforcedsourceid ON diaforcedsource_snapshot(diaforcedsourceid);
-CREATE INDEX ix_dfsss_processing_version ON diaforcedsource_snapshot(processing_version);
+CREATE INDEX ix_dfsss_diaforcedsource ON diaforcedsource_snapshot(diaforcedsourceid,processing_version);
 CREATE INDEX ix_dfsss_snapshot ON diaforcedsource_snapshot(snapshot);
+ALTER TABLE diaforcedsource_snapshot ADD CONSTRAINT fk_diaforcedsource_snapshot_forcedsource
+  FOREIGN KEY (diaforcedsourceid, processing_version) REFERENCES diaforcedsource(diaforcedsourceid, processing_version)
+  ON DELETE CASCADE;
+ALTER TABLE diaforcedsource_snapshot ADD CONSTRAINT fk_diaforcedsource_snapshot_snapshot
+  FOREIGN KEY (snapshot) REFERENCES snapshot(id) ON DELETE CASCADE;
 
-COMMIT;
+
+CREATE TABLE migrations_applied(
+  filename text,
+  applied_time timestamp with time zone DEFAULT NOW()
+);
+INSERT INTO migrations_applied(filename) VALUES('2025-02-18_001_init.sql');

@@ -9,7 +9,9 @@ This needs to be moved somewhere better.
 ### Building for tests
 
 ```
-./configure --with-webapdir=$PWD/install/webap
+./configure --with-webapdir=$PWD/install/webap \
+            --with-smtp-server=mailhog \
+            --with-smtp-port=1025
 make install
 ```
 

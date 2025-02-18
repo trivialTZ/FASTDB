@@ -7,27 +7,87 @@ services:
     build:
       context: ./docker/postgres
       target: postgres
+    volumes:
+      - type: volume
+        source: postgres_data
+        target: /var/lib/postgresql/data
     healthcheck:
       test: netcat -w 1 localhost 5432 || exit 1
       interval: 5s
       timeout: 10s
       retries: 5
 
-  # createdb:
-  #   depends_on:
-  #     postgres: service_healthy
-  #   image: ${DOCKER_ARCHIVE:-registry.nersc.gov/m1727/rkanop}/fastdb-shell:${DOCKER_VERSION:-latest}
-  #   build:
-  #     context: ./docker/webserver
-  #   healthcheck:
+  createdb:
+    depends_on:
+      postgres:
+        condition: service_healthy
+    image: ${DOCKER_ARCHIVE:-registry.nersc.gov/m1727/rkanop}/fastdb-shell:${DOCKER_VERSION:-latest}
+    build:
+      context: ./docker/webserver
+    volumes:
+      - type: bind
+        source: .
+        target: /code
+    working_dir: /code/db
+    entrypoint: [ "python", "apply_migrations.py" ]
+
+  mailhog:
+    image: mailhog/mailhog:latest
+    ports:
+      - "${MAILHOG_PORT:-8025}:8025"
+
+  webap:
+    depends_on:
+      createdb:
+        condition: service_completed_successfully
+      mailhog:
+        condition: service_started
+    image: ${DOCKER_ARCHIVE:-registry.nersc.gov/m1727/raknop}/fastdb-webap:${DOCKER_VERSION:-latest}
+    build:
+      context: ./docker/webserver
+      target: webserver
+    user: ${USERID:-0}:${GROUPID:-0}
+    ports:
+      - "${WEBPORT:-8080}:8080"
+    volumes:
+      - type: bind
+        source: tests/secrets
+        target: /secrets
+      - type: bind
+        source: .
+        target: /code
+      - type: bind
+        source: install/webap
+        target: /flask
+      - type: bind
+        source: install/sessions
+        target: /sessions
 
   shell:
     depends_on:
       postgres:
         condition: service_healthy
-    image: ${DOCKER_ARCHIVE:-registyr.nersc.gov/m1727/raknop}/fastdb-shell:${DOCKER_VERSION:-latest}
+      # createdb:
+      #   condition: service_completed_successfully
+    image: ${DOCKER_ARCHIVE:-registry.nersc.gov/m1727/raknop}/fastdb-shell:${DOCKER_VERSION:-latest}
     build:
       context: ./docker/webserver
       target: shell
-    
-  
+    user: ${USERID:-0}:${GROUPID:-0}
+    volumes:
+      - type: bind
+        source: tests/secrets
+        target: /secrets
+      - type: bind
+        source: .
+        target: /code
+      - type: bind
+        source: install/webap
+        target: /flask
+      - type: bind
+        source: install/sessions
+        target: /sessions
+    working_dir: /code
+
+volumes:
+  postgres_data:

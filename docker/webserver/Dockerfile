@@ -39,6 +39,7 @@ RUN source /venv/bin/activate && \
        flask \
        flask-session \
        flask-sock \
+       gevent \
        gunicorn \
        psycopg2 \
        pycryptodome \
@@ -89,4 +90,4 @@ ENV PATH=/venv/bin:$PATH
 RUN mkdir /sessions
 
 EXPOSE 8080
-ENTRYPOINT [ "/venv/bin/gunicorn", "-b", "0.0.0.0:8080", "--access-logfile", "-", "--error-logfile", "-", "-k", "gevent", "--timeout", "300", "--workers", "40" ]
+ENTRYPOINT [ "/venv/bin/gunicorn", "-b", "0.0.0.0:8080", "--access-logfile", "-", "--error-logfile", "-", "-k", "gevent", "--timeout", "300", "--workers", "40", "server:app" ]
