@@ -1,0 +1,33 @@
+# This is a docker compose environment to bring up a dev/test fastdb
+# environment
+
+services:
+  postgres:
+    image: ${DOCKER_ARCHIVE:-registry.nersc.gov/m1727/raknop}/fastdb-postres:${DOCKER_VERSION:-latest}
+    build:
+      context: ./docker/postgres
+      target: postgres
+    healthcheck:
+      test: netcat -w 1 localhost 5432 || exit 1
+      interval: 5s
+      timeout: 10s
+      retries: 5
+
+  # createdb:
+  #   depends_on:
+  #     postgres: service_healthy
+  #   image: ${DOCKER_ARCHIVE:-registry.nersc.gov/m1727/rkanop}/fastdb-shell:${DOCKER_VERSION:-latest}
+  #   build:
+  #     context: ./docker/webserver
+  #   healthcheck:
+
+  shell:
+    depends_on:
+      postgres:
+        condition: service_healthy
+    image: ${DOCKER_ARCHIVE:-registyr.nersc.gov/m1727/raknop}/fastdb-shell:${DOCKER_VERSION:-latest}
+    build:
+      context: ./docker/webserver
+      target: shell
+    
+  

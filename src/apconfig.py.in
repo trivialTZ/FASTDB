@@ -1,0 +1,13 @@
+sessionstore = "/sessions"
+dbuser = "@dbuser@"
+dbpasswdfile = "@dbpasswdfile@"
+dbhost = "@dbhost@"
+dbport = "@dbport@"
+dbdatabase = "@dbdatabase@"
+secretkeyfile = "@secretkeyfile@"
+emailfrom = "@emailfrom@"
+smtpserver = "@smtpserver@"
+smtpport = @smtpport@
+smtpusessl = @smtpusessl@
+smtpusername = @smtpusername@
+smtppassword = @smtppassword@

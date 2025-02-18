@@ -1,0 +1,16 @@
+# Autoconf debris
+/Makefile
+/aclocal.m4
+/autom4te.cache
+/config.log
+/config.status
+/install-sh
+/missing
+/src/Makefile
+/src/apconfig.py
+
+# Test install location
+install/webap
+
+# Emacs backup files
+**~

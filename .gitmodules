@@ -1,0 +1,3 @@
+[submodule "extern/rkwebutil"]
+	path = extern/rkwebutil
+	url = https://github.com/rknop/rkwebutil.git
