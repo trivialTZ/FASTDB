@@ -240,7 +240,7 @@ webapdir = @webapdir@
 AUTOMAKE_OPTION = subdir-objects
 templdir = @webapdir@/templates
 staticdir = @webapdir@/static
-webap_DATA = server.py apconfig.py \
+webap_DATA = server.py db.py util.py apconfig.py \
 	../extern/rkwebutil/rkwebutil.py ../extern/rkwebutil/rkauth_flask.py
 
 static_DATA = static/fastdb.css static/fastdb.js static/fastdb_start.js \

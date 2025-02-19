@@ -41,8 +41,11 @@ RUN source /venv/bin/activate && \
        flask-sock \
        gevent \
        gunicorn \
+       numpy \
        psycopg2 \
        pycryptodome \
+       pytest \
+       pytest-timestamper \
        python-dateutil \
        pytz \
        requests \

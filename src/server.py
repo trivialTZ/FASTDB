@@ -13,18 +13,13 @@ import flask.views
 
 import rkauth_flask
 
+
 # ======================================================================
 # Global config
 
 import apconfig
 with open( apconfig.secretkeyfile ) as ifp:
     _flask_session_secret_key = ifp.readline().strip()
-with open( apconfig.dbpasswdfile ) as ifp:
-    _dbpasswd = ifp.readline().strip()
-_dbhost = apconfig.dbhost
-_dbport = apconfig.dbport
-_dbuser = apconfig.dbuser
-_dbname = apconfig.dbdatabase
 
 
 # ======================================================================
@@ -36,7 +31,6 @@ class UUIDJSONEncoder( simplejson.JSONEncoder ):
             return str(obj)
         else:
             return super().default( obj )
-
 
 
 # ======================================================================

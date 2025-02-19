@@ -1,3 +1,6 @@
+# Python cache
+**/__pycache__/**
+
 # Autoconf debris
 /Makefile
 /aclocal.m4

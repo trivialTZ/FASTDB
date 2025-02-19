@@ -74,6 +74,8 @@ services:
       context: ./docker/webserver
       target: shell
     user: ${USERID:-0}:${GROUPID:-0}
+    environment:
+      - PYTHONPATH=/flask
     volumes:
       - type: bind
         source: tests/secrets
