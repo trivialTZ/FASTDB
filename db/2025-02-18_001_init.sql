@@ -23,13 +23,13 @@ CREATE INDEX ix_passwordlink_userid ON passwordlink USING btree (userid);
 -- ProcessingVersion
 -- Most things are tagged with a processing version so that
 --   we can have multiple versions of the same thing
-CREATE TABLE processingversion(
+CREATE TABLE processing_version(
   id integer PRIMARY KEY,
   description text,
   validity_start timestamp with time zone NOT NULL,
   validity_end timestamp with time zone
 );
-CREATE UNIQUE INDEX idx_processingversion_desc ON processingversion(description);  
+CREATE UNIQUE INDEX idx_processingversion_desc ON processing_version(description);  
 
 -- SnapShot
 -- Can define a set of objects by tagging the processing version and thing id
@@ -85,7 +85,7 @@ CREATE INDEX idx_diaobject_q3c ON diaobject (q3c_ang2ipix(ra, dec));
 CREATE INDEX idx_diaobject_diaobjectid ON diaobject(diaobjectid);
 CREATE INDEX idx_diaobject_procver ON diaobject(processing_version);
 ALTER TABLE diaobject ADD CONSTRAINT fk_diaobject_procver
-  FOREIGN KEY (processing_version) REFERENCES processingversion(id) ON DELETE RESTRICT;
+  FOREIGN KEY (processing_version) REFERENCES processing_version(id) ON DELETE RESTRICT;
 
 -- Selected from DiaSource APDB table
 -- Flags converted to the flags bitfield:
@@ -199,7 +199,7 @@ ALTER TABLE diasource ADD CONSTRAINT fk_diasource_diaobjectid
   FOREIGN KEY (diaobjectuuid) REFERENCES diaobject(id) ON DELETE CASCADE;
 CREATE INDEX idx_diasource_procver ON diasource(processing_version);
 ALTER TABLE diasource ADD CONSTRAINT fk_diasource_procver
-  FOREIGN KEY (processing_version) REFERENCES processingversion(id) ON DELETE RESTRICT;
+  FOREIGN KEY (processing_version) REFERENCES processing_version(id) ON DELETE RESTRICT;
   
 CREATE TABLE diasource_default PARTITION OF diasource DEFAULT;
 
@@ -235,7 +235,7 @@ ALTER TABLE diaforcedsource ADD CONSTRAINT fk_diaforcedsource_diaobjectid
   FOREIGN KEY (diaobjectuuid) REFERENCES diaobject(id) ON DELETE CASCADE;
 CREATE INDEX idx_diaforcedsource_procver ON diaforcedsource(processing_version);
 ALTER TABLE diaforcedsource ADD CONSTRAINT fk_diaforcedsource_procver
-  FOREIGN KEY (processing_version) REFERENCES processingversion(id) ON DELETE RESTRICT;
+  FOREIGN KEY (processing_version) REFERENCES processing_version(id) ON DELETE RESTRICT;
 
 CREATE TABLE diaforcedsource_default PARTITION OF diaforcedsource DEFAULT;
 

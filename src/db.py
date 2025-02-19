@@ -446,21 +446,26 @@ class DBBase:
               * a list of dicts.  The keys in all dicts must be the same
               * a list of objects of type cls
 
-           upsert: bool, default False
+            Note: passing a list of objects will not work on classes
+            whose table includes jsonb columns.  If using one of the
+            other forms, you cannot include the jsonb columns in the
+            dictionaries.  (Which means you can't fill jsonb columns
+            using this class method.)
+
+          upsert: bool, default False
              If False, then objects whose primary key is already in the
              database will be ignored.  If True, then objects whose
              primary key is already in the database will be updated with
              the values in dict.  (SQL will have ON CONFLICT DO NOTHING
              if False, ON CONFLICT DO UPDATE if True.)
 
-           assume_no_conflict: bool, default False
+          assume_no_conflict: bool, default Falsea
              Usually you just want to leave this False.  There are
              obscure kludge cases (e.g. if you're playing games and have
              removed primary key constraints and you know what you're
              doing-- this happens in load_snana_fits.py, for instance)
              where the conflict clauses cause the sql to fail.  Set this
              to True to avoid having those clauses.
-
 
         Returns
         -------
@@ -522,7 +527,7 @@ class PasswordLink( DBBase ):
 # ======================================================================
 
 class ProcessingVersion( DBBase ):
-    __tablename__ = "processingversion"
+    __tablename__ = "processing_version"
     _tablemeta = None
     _pk = [ 'id' ]
 

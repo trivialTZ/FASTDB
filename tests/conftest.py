@@ -17,7 +17,7 @@ def procver1():
     yield pv
     with DB() as con:
         cursor = con.cursor()
-        cursor.execute( "DELETE FROM processingversion WHERE id=%(id)s",
+        cursor.execute( "DELETE FROM processing_version WHERE id=%(id)s",
                         { 'id': pv.id } )
         con.commit()
 
@@ -34,7 +34,7 @@ def procver2():
     yield pv
     with DB() as con:
         cursor = con.cursor()
-        cursor.execute( "DELETE FROM processingversion WHERE id=%(id)s",
+        cursor.execute( "DELETE FROM processing_version WHERE id=%(id)s",
                         { 'id': pv.id } )
         con.commit()
 
