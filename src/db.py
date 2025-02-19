@@ -311,9 +311,9 @@ class DBBase:
             #   general, but I know that the only case I'll need it (at leasdt
             #   as of this writing) is with uuids.
             if pktyp == 'uuid':
-                onlist += f"{_and} CAST( t.{pk} AS uuid)={cls.__tablename__}.{pk}"
+                onlist += f"{_and} CAST( t.{pk} AS uuid)={cls.__tablename__}.{pk} "
             else:
-                onlist += f"{_and} t.{pk}={cls.__tablename__}.{pk}"
+                onlist += f"{_and} t.{pk}={cls.__tablename__}.{pk} "
             _and = "AND"
             comma = ","
 
@@ -433,7 +433,7 @@ class AuthUser( DBBase ):
 # ======================================================================
 
 class PasswordLink( DBBase ):
-    __tablename__ = "paswordlink"
+    __tablename__ = "passwordlink"
     _tablemeta = None
     _pk = [ 'id' ]
 
@@ -444,3 +444,51 @@ class ProcessingVersion( DBBase ):
     __tablename__ = "processingversion"
     _tablemeta = None
     _pk = [ 'id' ]
+
+
+# ======================================================================
+
+class Snapshot( DBBase ):
+    __tablename__ = "snapshot"
+    _tablemeta = None
+    _pk = [ 'id' ]
+
+
+# ======================================================================
+
+class DiaObject( DBBase ):
+    __tablename__ = "diaobject"
+    _tablemeta = None
+    _pk = [ 'id' ]
+
+
+# ======================================================================
+
+class DiaSource( DBBase ):
+    __tablename__ = "diasource"
+    _tablemeta = None
+    _pk = [ 'diasourceid', 'processing_version' ]
+
+
+# ======================================================================
+
+class DiaForcedSource( DBBase ):
+    __tablename__ = "diaforcedsource"
+    _tablemeta = None
+    _pk = [ 'diaforcedsourceid', 'processing_version' ]
+
+
+# ======================================================================
+
+class DiaSourceSnapshot( DBBase ):
+    __tablename__ = "diasource_snapshot"
+    _tablemeta = None
+    _pk = [ 'diasourceid', 'processing_version', 'snapshot' ]
+
+
+# ======================================================================
+
+class DiaForcedSourceSnapshot( DBBase ):
+    __tablename__ = "diaforcedsource_snapshot"
+    _tablemeta = None
+    _pk = [ 'diaforcedsourceid', 'processing_version', 'snapshot' ]

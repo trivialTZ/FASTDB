@@ -29,7 +29,7 @@ CREATE TABLE processingversion(
   validity_start timestamp with time zone NOT NULL,
   validity_end timestamp with time zone
 );
-CREATE INDEX idx_processingversion_desc ON processingversion(description);  
+CREATE UNIQUE INDEX idx_processingversion_desc ON processingversion(description);  
 
 -- SnapShot
 -- Can define a set of objects by tagging the processing version and thing id
@@ -38,7 +38,7 @@ CREATE TABLE snapshot(
   description text,
   creation_time timestamp with time zone DEFAULT NOW()
 );
-CREATE INDEX idx_snapshot_desc ON snapshot(description);
+CREATE UNIQUE INDEX idx_snapshot_desc ON snapshot(description);
 
 
 -- Selected from the APDB table from
@@ -201,6 +201,8 @@ CREATE INDEX idx_diasource_procver ON diasource(processing_version);
 ALTER TABLE diasource ADD CONSTRAINT fk_diasource_procver
   FOREIGN KEY (processing_version) REFERENCES processingversion(id) ON DELETE RESTRICT;
   
+CREATE TABLE diasource_default PARTITION OF diasource DEFAULT;
+
 
 -- Selected from DiaForcedSource APDB table
 CREATE TABLE diaforcedsource (
@@ -235,6 +237,7 @@ CREATE INDEX idx_diaforcedsource_procver ON diaforcedsource(processing_version);
 ALTER TABLE diaforcedsource ADD CONSTRAINT fk_diaforcedsource_procver
   FOREIGN KEY (processing_version) REFERENCES processingversion(id) ON DELETE RESTRICT;
 
+CREATE TABLE diaforcedsource_default PARTITION OF diaforcedsource DEFAULT;
 
 
 CREATE TABLE diasource_snapshot(
@@ -252,6 +255,7 @@ ALTER TABLE diasource_snapshot ADD CONSTRAINT fk_diasource_snapshot_source
 ALTER TABLE diasource_snapshot ADD CONSTRAINT fk_diasource_snapshot_snapshot
   FOREIGN KEY (snapshot) REFERENCES snapshot(id) ON DELETE CASCADE;
 
+CREATE TABLE diasource_snapshot_default PARTITION OF diasource_snapshot DEFAULT;
 
 
 CREATE TABLE diaforcedsource_snapshot(
@@ -269,6 +273,7 @@ ALTER TABLE diaforcedsource_snapshot ADD CONSTRAINT fk_diaforcedsource_snapshot_
 ALTER TABLE diaforcedsource_snapshot ADD CONSTRAINT fk_diaforcedsource_snapshot_snapshot
   FOREIGN KEY (snapshot) REFERENCES snapshot(id) ON DELETE CASCADE;
 
+CREATE TABLE diaforcedsource_snapshot_default PARTITION OF diaforcedsource_snapshot DEFAULT;
 
 CREATE TABLE migrations_applied(
   filename text,

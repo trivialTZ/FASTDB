@@ -1,6 +1,8 @@
 import pytest
 import uuid
 
+import psycopg2
+
 from db import DB
 
 
@@ -8,8 +10,9 @@ class BaseTestDB:
     # Derived classes must define a fixture basetest_setup which defines the following:
     #     self.cls : The class we're testing (a subclass of DBBase)
     #     self.columns : Set, the names of the columns in the class
-    #                    The first in this set must be unique between dict1, dict2, dict3
-    #     self.safe_to_modify : list of columns that aren't part of a unique or primary key constraint
+    #     self.safe_to_modify : list of columns that aren't part of a unique, foreign key, or primary key constraint
+    #                           They should have different values in all of dict1, dict2, dict3
+    #     self.uniques : list of columns that have a solo unique constraint but arent pk or fk
     #     self.obj1 : An object of the class, built manually, not inserted
     #     self.dict1 : A dictionary with key: value corresponding to the table, for self.obj1
     #     self.obj2 : Another object like self.obj1 but with diferent values, not inserted
@@ -55,7 +58,7 @@ class BaseTestDB:
     def test_instantiate( self, basetest_setup ):
         # Test basic instantiation
         obj = self.cls( **self.dict1 )
-        assert obj.id is not None
+        assert all( getattr( obj, k ) is not None for k in obj._pk )
         for k, v in self.dict1.items():
             assert getattr( obj, k ) == v
 
@@ -72,6 +75,10 @@ class BaseTestDB:
             assert cursor.rowcount == 1
 
     def test_full_udpate( self, obj1_inserted, obj2_inserted ):
+        if len( self.columns ) == len( self.cls._pk ):
+            # All columns are part of the primary key, so updating is meaningless
+            return
+
         origpk1 = self.obj1.pks
         origpk2 = self.obj2.pks
         obj1 = self.cls.get( *origpk1 )
@@ -99,11 +106,14 @@ class BaseTestDB:
 
 
     def test_some_update( self, obj1_inserted, obj2_inserted ):
-        obj1 = self.cls.get( *self.obj1.pks )
+        if len( self.safe_to_modify ) == 0:
+            # Can't run this test, so just pass
+            return
 
-        nonpkkeys = list( k for k in self.dict3.keys() if k not in self.cls._pk )
-        toupdate = nonpkkeys[:1]
-        tonotupdate = nonpkkeys[1:]
+        toupdate = self.safe_to_modify[:1]
+        tonotupdate = [] if len(self.safe_to_modify) == 1 else self.safe_to_modify[1:]
+
+        obj1 = self.cls.get( *self.obj1.pks )
 
         for k in toupdate:
             setattr( obj1, k, self.dict3[k] )
@@ -119,14 +129,19 @@ class BaseTestDB:
 
 
     def test_refresh( self, obj1_inserted ):
+        modkws = [ k for k in self.safe_to_modify if k in self.dict3 ]
+        if len( modkws ) == 0:
+            # Can't run this test, so just pass
+            return
+
         obj1 = self.cls.get( *self.obj1.pks )
         mungedobj1 = self.cls.get( *self.obj1.pks )
-        nonpkkeys = list( k for k in self.dict3.keys() if k not in self.cls._pk )
-        for k in nonpkkeys:
+
+        for k in modkws:
             v = self.dict3[k]
             setattr( mungedobj1, k, v )
 
-        for k in nonpkkeys:
+        for k in modkws:
             assert getattr( mungedobj1, k )  != getattr( obj1, k )
 
         mungedobj1.refresh()
@@ -163,7 +178,12 @@ class BaseTestDB:
 
 
     def test_get_by_attrs( self, obj1_inserted, obj2_inserted ):
-        k0 = self.safe_to_modify[0]
+        if len( self.safe_to_modify ) == 0:
+            # Can't run this test, so just pass
+            return
+
+        tomod = [ k for k in self.safe_to_modify if k in self.dict3 ]
+        k0 = tomod[0]
 
         # Get one
         kwargs = { k0: self.dict1[k0] }
@@ -178,10 +198,11 @@ class BaseTestDB:
         assert len(gotten) == 0
 
         # The rest of these tests require there to be
-        #   two modifiable attributes
+        #   two modifiable attributes that exist
+        #   also in dict3
 
-        if len( self.safe_to_modify ) > 1:
-            k1 = self.safe_to_modify[1]
+        if len( tomod ) > 1:
+            k1 = tomod[1]
 
             # Get two
             kwargs = { k0: self.dict1[k0], k1: self.dict1[k1] }
@@ -207,3 +228,16 @@ class BaseTestDB:
             gotten = self.cls.getbyattrs( **kwargs )
             assert len(gotten) == 2
             assert sorted( [ i.pks for i in gotten ] ) == sorted( [ self.obj1.pks, self.obj2.pks ] )
+
+    def test_unique( self, obj1_inserted ):
+        if len( self.uniques ) == 0:
+            # Can't run this test, so jus tpass
+            return
+
+        for unique in self.uniques:
+            d = dict( self.dict3 )
+            d[unique] = self.dict1[unique]
+            obj = self.cls( **d )
+            with pytest.raises( psycopg2.errors.UniqueViolation,
+                                match="duplicate key value violates unique constraint" ):
+                obj.insert()
