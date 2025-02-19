@@ -42,6 +42,7 @@ RUN source /venv/bin/activate && \
        gevent \
        gunicorn \
        numpy \
+       pandas \
        psycopg2 \
        pycryptodome \
        pytest \

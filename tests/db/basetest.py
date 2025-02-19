@@ -2,6 +2,7 @@ import pytest
 import uuid
 
 import psycopg2
+import psycopg2.extras
 
 from db import DB
 
@@ -231,7 +232,7 @@ class BaseTestDB:
 
     def test_unique( self, obj1_inserted ):
         if len( self.uniques ) == 0:
-            # Can't run this test, so jus tpass
+            # Can't run this test, so just pass
             return
 
         for unique in self.uniques:
@@ -241,3 +242,81 @@ class BaseTestDB:
             with pytest.raises( psycopg2.errors.UniqueViolation,
                                 match="duplicate key value violates unique constraint" ):
                 obj.insert()
+
+    def test_delete( self, basetest_setup, obj1_inserted, obj2_inserted ):
+        objs = self.cls.get_batch( [ self.obj1.pks, self.obj2.pks ] )
+        assert len(objs) == 2
+
+        self.obj1.delete_from_db()
+        objs = self.cls.get_batch( [ self.obj1.pks, self.obj2.pks ] )
+        assert len(objs) == 1
+        assert [ getattr( objs[0], k ) for k in self.cls._pk ] == self.obj2.pks
+
+
+    # This just tests functionality, not performance
+    def test_bulk_upsert( self, basetest_setup ):
+        try:
+            objs = self.cls.get_batch( [ self.obj1.pks, self.obj2.pks ] )
+            assert len(objs) == 0
+
+            self.cls.load_table_meta()
+            jsoncols = [ c for c in self.cls._tablemeta if self.cls._tablemeta[c]['data_type'] == 'jsonb' ]
+
+            # First : list of objects
+            # We know this won't work if there are any json columns
+            if len( jsoncols ) == 0:
+                n = self.cls.bulk_insert_or_upsert( [ self.obj1, self.obj2 ] )
+                assert n == 2
+
+                objs = self.cls.get_batch( [ self.obj1.pks, self.obj2.pks ] )
+                assert len(objs) == 2
+                assert ( sorted( [ [ getattr(o, k) for k in self.cls._pk ] for o in objs ] ) ==
+                         sorted( [ self.obj1.pks, self.obj2.pks ] ) )
+                for obj in [ self.obj1, self.obj2 ]:
+                    which = [ o for o in objs if [ getattr(o, k) for k in self.cls._pk ] == obj.pks ]
+                    which = which[0]
+                    assert all( getattr( which, k ) == getattr( obj, k ) for k in self.columns )
+
+                self.obj1.delete_from_db()
+                self.obj2.delete_from_db()
+
+            # Next : list of dictionaries
+            # Strip out the json columns
+            dicts = [ o._build_subdict() for o in [ self.obj1, self.obj2 ] ]
+            dicts = [ { k: v for k, v in d.items() if k not in jsoncols } for d in dicts ]
+            n = self.cls.bulk_insert_or_upsert( dicts )
+            assert n == 2
+            objs = self.cls.get_batch( [ self.obj1.pks, self.obj2.pks ] )
+            assert len( objs ) == 2
+            assert ( sorted( [ [ getattr(o, k) for k in self.cls._pk ] for o in objs ] )
+                     == sorted( [ self.obj1.pks, self.obj2.pks ] ) )
+            for obj in [ self.obj1, self.obj2 ]:
+                which = [ o for o in objs if [ getattr(o, k) for k in self.cls._pk ] == obj.pks ]
+                which = which[0]
+                assert all( getattr( which, k ) == getattr( obj, k ) for k in self.columns if k not in jsoncols )
+            self.obj1.delete_from_db()
+            self.obj2.delete_from_db()
+
+            # Next : dictionary of lists
+            dicts = [ o._build_subdict() for o in [ self.obj1, self.obj2 ] ]
+            dicts = [ { k: v for k, v in d.items() if k not in jsoncols } for d in dicts ]
+            dictoflists = { k: [ d[k] for d in dicts ] for k in dicts[0].keys() }
+            n = self.cls.bulk_insert_or_upsert( dictoflists )
+            assert n == 2
+            objs = self.cls.get_batch( [ self.obj1.pks, self.obj2.pks ] )
+            assert len( objs ) == 2
+            assert ( sorted( [ [ getattr(o, k) for k in self.cls._pk ] for o in objs ] )
+                     == sorted( [ self.obj1.pks, self.obj2.pks ] ) )
+            for obj in [ self.obj1, self.obj2 ]:
+                which = [ o for o in objs if [ getattr(o, k) for k in self.cls._pk ] == obj.pks ]
+                which = which[0]
+                assert all( getattr( which, k ) == getattr( obj, k ) for k in self.columns if k not in jsoncols )
+            self.obj1.delete_from_db()
+            self.obj2.delete_from_db()
+
+
+            # TODO : test updating, conflicts, etc.
+
+        finally:
+            self.obj1.delete_from_db()
+            self.obj2.delete_from_db()

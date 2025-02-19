@@ -1,12 +1,18 @@
 # IMPORTANT : make sure that everything in here stays synced with the
 #   database schema managed by migrations in ../db
+#
+# WARNING : code here will drop the table "temp_bulk_upsert" if you make it, so don't make that table.
+#
+# WARNING : code assumes all column names are lowercase.  Don't mix case in column names.
 
+import io
 import uuid
 import collections
 
 from contextlib import contextmanager
 
 import numpy as np
+import pandas
 import psycopg2
 import psycopg2.extras
 
@@ -398,6 +404,14 @@ class DBBase:
                 if refresh:
                     self.refresh( con )
 
+    def delete_from_db( self, dbcon=None, nocommit=False ):
+        where, subdict = self._construct_pk_query_where( me=self )
+        q = f"DELETE FROM {self.__tablename__} {where}"
+        with DB( dbcon ) as con:
+            cursor = con.cursor()
+            cursor.execute( q, subdict )
+            con.commit()
+
 
     def update( self, dbcon=None, refresh=False, nocommit=False ):
         if refresh and nocommit:
@@ -417,6 +431,73 @@ class DBBase:
                 con.commit()
                 if refresh:
                     self.refresh( con )
+
+    @classmethod
+    def bulk_insert_or_upsert( cls, data, upsert=False, assume_no_conflict=False, dbcon=None ):
+        """Try to efficiently insert a bunch of data into the database.
+
+        Parmeters
+        ---------
+          data: dict or list
+            Can be one of:
+              * a dict of { kw: iterable }.  All of the iterables must
+                have the same length, and must be something that
+                pandas.DataFrame could handle
+              * a list of dicts.  The keys in all dicts must be the same
+              * a list of objects of type cls
+
+           upsert: bool, default False
+             If False, then objects whose primary key is already in the
+             database will be ignored.  If True, then objects whose
+             primary key is already in the database will be updated with
+             the values in dict.  (SQL will have ON CONFLICT DO NOTHING
+             if False, ON CONFLICT DO UPDATE if True.)
+
+           assume_no_conflict: bool, default False
+             Usually you just want to leave this False.  There are
+             obscure kludge cases (e.g. if you're playing games and have
+             removed primary key constraints and you know what you're
+             doing-- this happens in load_snana_fits.py, for instance)
+             where the conflict clauses cause the sql to fail.  Set this
+             to True to avoid having those clauses.
+
+
+        Returns
+        -------
+           inserted: int
+             The number of rows actually inserted (which may be less than len(data)).
+
+        """
+
+        if len(data) == 0:
+            return
+
+        with DB( dbcon ) as con:
+            cursor = con.cursor()
+            cursor.execute( "DROP TABLE IF EXISTS temp_bulk_upsert" )
+            cursor.execute( f"CREATE TEMP TABLE temp_bulk_upsert (LIKE {cls.__tablename__})" )
+            if isinstance( data, list ) and isinstance( data[0], cls ):
+                data = [ obj._build_subdict() for obj in data ]
+            df = pandas.DataFrame( data )
+            strio = io.StringIO()
+            df.to_csv( strio, index=False, header=False, sep='\t', na_rep='\\N' )
+            strio.seek(0)
+            columns = df.columns.values
+            cursor.copy_from( strio, "temp_bulk_upsert", columns=columns, size=1048576 )
+            if not assume_no_conflict:
+                if not upsert:
+                    conflict = f"ON CONFLICT ({','.join(cls._pk)}) DO NOTHING"
+                else:
+                    conflict = ( f"ON CONFLICT ({','.join(cls._pk)}) DO UPDATE SET "
+                                 + ",".join( f"{c}=EXCLUDED.{c}" for c in columns ) )
+            else:
+                conflict = ""
+            q = f"INSERT INTO {cls.__tablename__} SELECT * FROM temp_bulk_upsert {conflict}"
+            cursor.execute( q )
+            ninserted = cursor.rowcount
+            cursor.execute( "DROP TABLE temp_bulk_upsert" )
+            con.commit()
+            return ninserted
 
 
 # ======================================================================
