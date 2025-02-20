@@ -39,11 +39,37 @@ services:
     ports:
       - "${MAILHOG_PORT:-8025}:8025"
 
+  queryrunner:
+    depends_on:
+      createdb:
+        condition: service_completed_successfully
+    image: ${DOCKER_ARCHIVE:-registry.nersc.gov/m1727/raknop}/fastdb-query-runner:${DOCKER_VERSION:-latest}
+    build:
+      context: ./docker/query_runner
+      target: queryrunner
+    user: ${USERID:-0}:${GROUPID:-0}
+    volumes:
+      - type: bind
+        source: tests/secrets
+        target: /secrets
+      - type: bind
+        source: install/webap
+        target: /flask
+      - type: volume
+        source: query_results
+        target: /query_results
+    post_start:
+      - command: /bin/bash -c "chown -R ${USERID:-0}:${GROUPID:-0} /query_results"
+        privileged: true
+        user: root
+
   webap:
     depends_on:
       createdb:
         condition: service_completed_successfully
       mailhog:
+        condition: service_started
+      queryrunner:
         condition: service_started
     image: ${DOCKER_ARCHIVE:-registry.nersc.gov/m1727/raknop}/fastdb-webap:${DOCKER_VERSION:-latest}
     build:
@@ -62,9 +88,19 @@ services:
       - type: bind
         source: install/webap
         target: /flask
-      - type: bind
-        source: install/sessions
+      - type: volume
+        source: sessions
         target: /sessions
+      - type: volume
+        source: query_results
+        target: /query_results
+    post_start:
+      - command: /bin/bash -c "
+                   chown -R ${USERID:-0}:${GROUPID:-0} /sessions
+                   && chown -R ${USERID:-0}:${GROUPID:-0} /query_results
+                   "
+        privileged: true
+        user: root
 
   shell:
     depends_on:
@@ -89,10 +125,22 @@ services:
       - type: bind
         source: install/webap
         target: /flask
-      - type: bind
-        source: install/sessions
+      - type: volume
+        source: sessions
         target: /sessions
+      - type: volume
+        source: query_results
+        target: /query_results
+    post_start:
+      - command: /bin/bash -c "
+                   chown -R ${USERID:-0}:${GROUPID:-0} /sessions
+                   && chown -R ${USERID:-0}:${GROUPID:-0} /query_results
+                   "
+        privileged: true
+        user: root
     working_dir: /code
 
 volumes:
   postgres_data:
+  query_results:
+  sessions:

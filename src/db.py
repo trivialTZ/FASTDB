@@ -29,6 +29,8 @@ dbport = apconfig.dbport
 dbuser = apconfig.dbuser
 dbname = apconfig.dbdatabase
 
+psycopg2.extensions.register_adapter(dict, psycopg2.extras.Json)
+
 
 # ======================================================================
 
@@ -578,3 +580,41 @@ class DiaForcedSourceSnapshot( DBBase ):
     __tablename__ = "diaforcedsource_snapshot"
     _tablemeta = None
     _pk = [ 'diaforcedsourceid', 'processing_version', 'snapshot' ]
+
+
+# ======================================================================
+class QueryQueue( DBBase ):
+    __tablename__ = "query_queue"
+    _tablemeta = None
+    _pk = [ 'queryid' ]
+
+    # Need some special handling of array attributes, until such a time
+    #   as I build that into DBBase
+
+    def insert( self, dbcon=None, refresh=True, nocommit=False ):
+        if refresh and nocommit:
+            raise RuntimeError( "Can't refresh with nocommit" )
+
+        subdict = self._build_subdict()
+
+        q = f"INSERT INTO {self.__tablename__}({','.join(subdict.keys())}) VALUES ("
+        comma = ""
+        for k in subdict.keys():
+            q += comma
+            comma = ","
+            if k == 'subdicts':
+                q += "%(subdicts)s::json[]"
+            else:
+                q += f"%({k})s"
+        q += ")"
+
+        with DB( dbcon ) as con:
+            cursor = con.cursor()
+            cursor.execute( q, subdict )
+            if not nocommit:
+                con.commit()
+                if refresh:
+                    self.refresh( con )
+
+    def update( self, dbcon=None, refresh=False, nocommit=False ):
+        raise NotImplementedError( "update not implemented for QueryQueue" )

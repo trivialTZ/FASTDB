@@ -6,8 +6,10 @@
 
 import sys
 import os
+import io
 import pathlib
 import time
+import uuid
 import requests
 import binascii
 import logging
@@ -93,7 +95,14 @@ class FASTDBClient:
 
         self.logger = logger
         if self.logger is None:
-            self.logger = logging.getLogger( "fastdb_client" )
+            # ARGH.  Logger can be frustrating.  I don't want to keep adding the handlers
+            #   over and over again, but sometimes self.logger.hasHandlers() was coming up True
+            #   even though there were no handlers.  (It may have to do with propagation,
+            #   and a logger that exists in pytest?)
+            # So that we don't get multiple-logging, we don't want to add a handler every
+            #   time.
+            # The solution: just make a new logger for every fastdb_client instance.
+            self.logger = logging.getLogger( str(uuid.uuid4()) )
             logout = logging.StreamHandler( sys.stderr )
             self.logger.addHandler( logout )
             formatter = logging.Formatter( '[%(asctime)s - FASTDB - %(levelname)s] - %(message)s',
@@ -495,7 +504,7 @@ class FASTDBClient:
         result = self.send( f"{self.check_long_sql_query_url}{queryid}/" )
         if 'status' not in result.keys():
             raise ValueError( "Unexpected response, no 'status' in return value" )
-        return result.json()
+        return result
 
 
     def get_long_sql_query_result( self, queryid ):
@@ -572,10 +581,15 @@ class FASTDBClient:
             data = self.check_long_sql_query( queryid )
 
             if data['status'] == 'error':
-                raise RuntimeError( f"Long query failed at {data['finished']} with error {data['error']}" )
+                strio = io.StringIO()
+                strio.write( "Long query failed" )
+                if 'finished' in data:
+                    strio.write( f" at {data['finished']}" )
+                strio.write( f"with error {data['error']}" )
+                raise RuntimeError( strio.getvalue() )
 
             elif data['status'] == 'finished':
-                self.logger.info( f"Long query started at {data['strated']} and finished at {data['finished']}" )
+                self.logger.info( f"Long query started at {data['started']} and finished at {data['finished']}" )
                 done = True
 
             elif data['status'] == 'started':
@@ -587,7 +601,7 @@ class FASTDBClient:
             else:
                 raise ValueError( f'Unexpected value of data["status"]: "{data["status"]}"' )
 
-            totwait = time.perf_counter - t0
+            totwait = time.perf_counter() - t0
 
         if not done:
             raise RuntimeError( f"Query failed to complete within {totwait} seconds." )

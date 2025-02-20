@@ -275,6 +275,24 @@ ALTER TABLE diaforcedsource_snapshot ADD CONSTRAINT fk_diaforcedsource_snapshot_
 
 CREATE TABLE diaforcedsource_snapshot_default PARTITION OF diaforcedsource_snapshot DEFAULT;
 
+
+CREATE TABLE query_queue(
+  queryid UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  userid UUID NOT NULL,
+  submitted timestamp with time zone,
+  started timestamp with time zone,
+  finished timestamp with time zone,
+  error boolean default False,
+  errortext text,
+  queries text[],
+  subdicts JSONB[],
+  format text default 'csv'
+);
+CREATE INDEX ix_query_queue_userid ON query_queue(userid);
+ALTER TABLE query_queue ADD CONSTRAINT fk_query_queue_userid
+  FOREIGN KEY (userid) REFERENCES authuser(id) ON DELETE CASCADE;
+
+
 CREATE TABLE migrations_applied(
   filename text,
   applied_time timestamp with time zone DEFAULT NOW()
