@@ -11,6 +11,9 @@ services:
       - type: volume
         source: postgres_data
         target: /var/lib/postgresql/data
+      - type: bind
+        source: tests/secrets
+        target: /secrets
     healthcheck:
       test: netcat -w 1 localhost 5432 || exit 1
       interval: 5s

@@ -23,11 +23,11 @@ import util
 
 import apconfig
 with open( apconfig.dbpasswdfile ) as ifp:
-    _dbpasswd = ifp.readline().strip()
-_dbhost = apconfig.dbhost
-_dbport = apconfig.dbport
-_dbuser = apconfig.dbuser
-_dbname = apconfig.dbdatabase
+    dbpasswd = ifp.readline().strip()
+dbhost = apconfig.dbhost
+dbport = apconfig.dbport
+dbuser = apconfig.dbuser
+dbname = apconfig.dbdatabase
 
 
 # ======================================================================
@@ -57,9 +57,9 @@ def DB( dbcon=None ):
         return
 
     try:
-        global _dbuser, _dbpasswd, _dbhost, _dbport, _dbname
+        global dbuser, dbpasswd, dbhost, dbport, dbname
         conn = None
-        conn = psycopg2.connect( dbname=_dbname, user=_dbuser, password=_dbpasswd, host=_dbhost, port=_dbport )
+        conn = psycopg2.connect( dbname=dbname, user=dbuser, password=dbpasswd, host=dbhost, port=dbport )
         yield conn
     finally:
         if conn is not None:
