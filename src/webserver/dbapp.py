@@ -7,7 +7,7 @@ import psycopg2
 
 import db
 from util import asUUID
-from webserver.server import BaseView
+from webserver.baseview import BaseView
 
 
 # ======================================================================]

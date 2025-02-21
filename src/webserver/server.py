@@ -11,8 +11,8 @@ from webserver.baseview import BaseView
 # ======================================================================
 # Global config
 
-import apconfig
-with open( apconfig.secretkeyfile ) as ifp:
+import config
+with open( config.secretkeyfile ) as ifp:
     _flask_session_secret_key = ifp.readline().strip()
 
 
@@ -39,7 +39,7 @@ app.config.from_mapping(
     SESSION_TYPE='filesystem',
     SESSION_PERMANENT=True,
     SESSION_USE_SIGNER=True,
-    SESSION_FILE_DIR=apconfig.sessionstore,
+    SESSION_FILE_DIR=config.sessionstore,
     SESSION_FILE_THRESHOLD=1000,
 )
 
@@ -51,14 +51,14 @@ rkauth_flask.RKAuthConfig.setdbparams(
     db_name=db.dbname,
     db_user=db.dbuser,
     db_password=db.dbpasswd,
-    email_from = apconfig.emailfrom,
+    email_from = config.emailfrom,
     email_subject = 'fastdb password reset',
     email_system_name = 'fastdb',
-    smtp_server = apconfig.smtpserver,
-    smtp_port = apconfig.smtpport,
-    smtp_use_ssl = apconfig.smtpusessl,
-    smtp_username = apconfig.smtpusername,
-    smtp_password = apconfig.smtppassword
+    smtp_server = config.smtpserver,
+    smtp_port = config.smtpport,
+    smtp_use_ssl = config.smtpusessl,
+    smtp_username = config.smtpusername,
+    smtp_password = config.smtppassword
 )
 app.register_blueprint( rkauth_flask.bp )
 

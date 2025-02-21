@@ -28,6 +28,7 @@ services:
     image: ${DOCKER_ARCHIVE:-registry.nersc.gov/m1727/raknop}/fastdb-shell:${DOCKER_VERSION:-latest}
     build:
       context: ./docker/webserver
+      target: shell
     user: ${USERID:-0}:${GROUPID:-0}
     volumes:
       - type: bind

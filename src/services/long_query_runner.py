@@ -13,7 +13,7 @@ import pandas
 import psycopg2
 import psycopg2.extras
 
-import apconfig
+import config
 
 _loglevel = logging.DEBUG
 
@@ -32,11 +32,11 @@ class QueryRunner:
         self.sleeptime = 10
 
         # Database settings.
-        self.dbname = apconfig.dbdatabase
-        self.dbhost = apconfig.dbhost
-        self.dbport = apconfig.dbport
-        self.dbuser = apconfig.dbuser
-        with open( apconfig.dbpasswdfile, "r" ) as ifp:
+        self.dbname = config.dbdatabase
+        self.dbhost = config.dbhost
+        self.dbport = config.dbport
+        self.dbuser = config.dbuser
+        with open( config.dbpasswdfile, "r" ) as ifp:
             self.dbpswd = ifp.readline().strip()
         # If the database was set up properly, the user
         #   postgres_ro has readonly access to all the

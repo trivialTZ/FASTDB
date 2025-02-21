@@ -1,3 +1,9 @@
+#
+# DOCKER_BUILDKIT=1 docker build --target queryrunner -t <image>:<label>.
+#
+# Rob, use:
+# DOCKER_BUILDKIT=1 docker build --target queryrunner -t registry.nersc.gov/m1727/raknop/fastdb-query-runner:rknop-dev .
+
 FROM rknop/devuan-daedalus-rknop AS base
 LABEL maintainer="Rob Knop <rknop@pobox.com>"
 

@@ -21,13 +21,13 @@ import util
 # ======================================================================
 # Global config
 
-import apconfig
-with open( apconfig.dbpasswdfile ) as ifp:
+import config
+with open( config.dbpasswdfile ) as ifp:
     dbpasswd = ifp.readline().strip()
-dbhost = apconfig.dbhost
-dbport = apconfig.dbport
-dbuser = apconfig.dbuser
-dbname = apconfig.dbdatabase
+dbhost = config.dbhost
+dbport = config.dbport
+dbuser = config.dbuser
+dbname = config.dbdatabase
 
 psycopg2.extensions.register_adapter(dict, psycopg2.extras.Json)
 

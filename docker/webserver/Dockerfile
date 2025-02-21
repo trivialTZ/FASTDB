@@ -1,4 +1,11 @@
-# This dockerfile must be run from the parent directory of the Dockerfile's directory
+#
+# DOCKER_BUILDKIT=1 docker build --target <target> -t <image>:<label>.
+#
+# You probably want to build for both targets webserver and shell
+#
+# Rob, use:
+#   DOCKER_BUILDKIT=1 docker build --target webserver -t registry.nersc.gov/m1727/raknop/fastdb-webap:rknop-dev .
+#   DOCKER_BUILDKIT=1 docker build --target shell -t registry.nersc.gov/m1727/raknop/fastdb-shell:rknop-dev .
 
 FROM rknop/devuan-daedalus-rknop AS base
 LABEL maintainer="Rob Knop <rknop@pobox.com>"
@@ -81,7 +88,7 @@ ENV PATH=/venv/bin:$PATH
 
 RUN mkdir -p /fastdb/webserver
 ENV PYTHONPATH=/fastdb
-WORKDIR /fastdb/webserver
+WORKDIR /fastdb
 
 ENTRYPOINT [ "tail", "-f", "/etc/issue" ]
 

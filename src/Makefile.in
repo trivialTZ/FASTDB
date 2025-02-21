@@ -238,7 +238,7 @@ top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 AUTOMAKE_OPTION = subdir-objects
 servicesdir = @installdir@/services
-install_DATA = config.py util.py
+install_DATA = config.py db.py util.py
 services_DATA = services/long_query_runner.py
 all: all-am
 
