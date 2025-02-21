@@ -629,7 +629,7 @@ dbuser
 dbdatabase
 dbport
 dbhost
-webapdir
+installdir
 AM_BACKSLASH
 AM_DEFAULT_VERBOSITY
 AM_DEFAULT_V
@@ -703,7 +703,7 @@ ac_subst_files=''
 ac_user_opts='
 enable_option_checking
 enable_silent_rules
-with_webapdir
+with_installdir
 with_dbhost
 with_dbport
 with_dbdatabase
@@ -1350,7 +1350,7 @@ Optional Features:
 Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
   --without-PACKAGE       do not use PACKAGE (same as --with-PACKAGE=no)
-  --with-webapdir=DIR     Directory to install webap to [/var/www/html]
+  --with-webapdir=DIR     Directory to install to [install]
   --with-dbhost=HOST      Postgres host [postgres]
   --with-dbport=PORT      Postgres port [5432]
   --with-dbdatabase=PORT  Database name [fastdb]
@@ -2525,16 +2525,16 @@ END
   fi
 fi
 
-ac_config_files="$ac_config_files Makefile src/Makefile src/apconfig.py"
+ac_config_files="$ac_config_files Makefile src/Makefile src/webserver/Makefile src/config.py"
 
 
 
-# Check whether --with-webapdir was given.
-if test ${with_webapdir+y}
+# Check whether --with-installdir was given.
+if test ${with_installdir+y}
 then :
-  withval=$with_webapdir; webapdir=$withval
+  withval=$with_installdir; installdir=$withval
 else $as_nop
-  webapdir=/var/www/html
+  installdir=/usr/local/fastdb
 fi
 
 
@@ -3376,7 +3376,8 @@ do
   case $ac_config_target in
     "Makefile") CONFIG_FILES="$CONFIG_FILES Makefile" ;;
     "src/Makefile") CONFIG_FILES="$CONFIG_FILES src/Makefile" ;;
-    "src/apconfig.py") CONFIG_FILES="$CONFIG_FILES src/apconfig.py" ;;
+    "src/webserver/Makefile") CONFIG_FILES="$CONFIG_FILES src/webserver/Makefile" ;;
+    "src/config.py") CONFIG_FILES="$CONFIG_FILES src/config.py" ;;
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5;;
   esac

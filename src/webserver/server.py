@@ -3,10 +3,10 @@ import logging
 import flask
 import flask_session
 
-from baseview import BaseView
-import rkauth_flask
-import dbapp
 import db
+import webserver.rkauth_flask as rkauth_flask
+import webserver.dbapp as dbapp
+from webserver.baseview import BaseView
 
 # ======================================================================
 # Global config

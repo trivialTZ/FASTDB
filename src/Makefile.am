@@ -1,13 +1,8 @@
 AUTOMAKE_OPTION = subdir-objects
 
-webapdir = @webapdir@
-templdir = @webapdir@/templates
-staticdir = @webapdir@/static
+installdir = @installdir@
+servicesdir = @installdir@/services
 
-webap_DATA = apconfig.py baseview.py dbapp.py db.py long_query_runner.py server.py util.py \
-	../extern/rkwebutil/rkwebutil.py ../extern/rkwebutil/rkauth_flask.py
+install_DATA = config.py util.py
 
-static_DATA = static/fastdb.css static/fastdb.js static/fastdb_start.js \
-	../extern/rkwebutil/rkwebutil.js ../extern/rkwebutil/rkauth.js ../extern/rkwebutil/resetpasswd_start.js
-
-templ_DATA = templates/base.html templates/fastdb_webap.html
+services_DATA = services/long_query_runner.py

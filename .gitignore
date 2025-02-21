@@ -10,10 +10,11 @@
 /install-sh
 /missing
 /src/Makefile
-/src/apconfig.py
+/src/config.py
+/src/webserver/Makefile
 
 # Test install location
-install/webap
+install/
 
 # Env file
 /.env

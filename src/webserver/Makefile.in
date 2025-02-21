@@ -86,14 +86,14 @@ POST_INSTALL = :
 NORMAL_UNINSTALL = :
 PRE_UNINSTALL = :
 POST_UNINSTALL = :
-subdir = src
+subdir = src/webserver
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
 DIST_COMMON = $(srcdir)/Makefile.am $(am__DIST_COMMON)
 mkinstalldirs = $(install_sh) -d
-CONFIG_CLEAN_FILES = config.py
+CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
@@ -141,10 +141,11 @@ am__uninstall_files_from_dir = { \
     || { echo " ( cd '$$dir' && rm -f" $$files ")"; \
          $(am__cd) "$$dir" && rm -f $$files; }; \
   }
-am__installdirs = "$(DESTDIR)$(installdir)" "$(DESTDIR)$(servicesdir)"
-DATA = $(install_DATA) $(services_DATA)
+am__installdirs = "$(DESTDIR)$(staticdir)" "$(DESTDIR)$(templdir)" \
+	"$(DESTDIR)$(webapdir)"
+DATA = $(static_DATA) $(templ_DATA) $(webap_DATA)
 am__tagged_files = $(HEADERS) $(SOURCES) $(TAGS_FILES) $(LISP)
-am__DIST_COMMON = $(srcdir)/Makefile.in $(srcdir)/config.py.in
+am__DIST_COMMON = $(srcdir)/Makefile.in
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 ACLOCAL = @ACLOCAL@
 AMTAR = @AMTAR@
@@ -237,9 +238,17 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 AUTOMAKE_OPTION = subdir-objects
-servicesdir = @installdir@/services
-install_DATA = config.py util.py
-services_DATA = services/long_query_runner.py
+webapdir = @installdir@/webserver
+templdir = @installdir@/webserver/templates
+staticdir = @installdir@/webserver/static
+webap_DATA = baseview.py dbapp.py server.py \
+	../../extern/rkwebutil/rkwebutil.py ../../extern/rkwebutil/rkauth_flask.py
+
+static_DATA = static/fastdb.css static/fastdb.js static/fastdb_start.js \
+	../../extern/rkwebutil/rkwebutil.js ../../extern/rkwebutil/rkauth.js \
+	../../extern/rkwebutil/resetpasswd_start.js
+
+templ_DATA = templates/base.html templates/fastdb_webap.html
 all: all-am
 
 .SUFFIXES:
@@ -252,9 +261,9 @@ $(srcdir)/Makefile.in:  $(srcdir)/Makefile.am  $(am__configure_deps)
 	      exit 1;; \
 	  esac; \
 	done; \
-	echo ' cd $(top_srcdir) && $(AUTOMAKE) --foreign src/Makefile'; \
+	echo ' cd $(top_srcdir) && $(AUTOMAKE) --foreign src/webserver/Makefile'; \
 	$(am__cd) $(top_srcdir) && \
-	  $(AUTOMAKE) --foreign src/Makefile
+	  $(AUTOMAKE) --foreign src/webserver/Makefile
 Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 	@case '$?' in \
 	  *config.status*) \
@@ -272,50 +281,69 @@ $(top_srcdir)/configure:  $(am__configure_deps)
 $(ACLOCAL_M4):  $(am__aclocal_m4_deps)
 	cd $(top_builddir) && $(MAKE) $(AM_MAKEFLAGS) am--refresh
 $(am__aclocal_m4_deps):
-config.py: $(top_builddir)/config.status $(srcdir)/config.py.in
-	cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@
-install-installDATA: $(install_DATA)
+install-staticDATA: $(static_DATA)
 	@$(NORMAL_INSTALL)
-	@list='$(install_DATA)'; test -n "$(installdir)" || list=; \
+	@list='$(static_DATA)'; test -n "$(staticdir)" || list=; \
 	if test -n "$$list"; then \
-	  echo " $(MKDIR_P) '$(DESTDIR)$(installdir)'"; \
-	  $(MKDIR_P) "$(DESTDIR)$(installdir)" || exit 1; \
+	  echo " $(MKDIR_P) '$(DESTDIR)$(staticdir)'"; \
+	  $(MKDIR_P) "$(DESTDIR)$(staticdir)" || exit 1; \
 	fi; \
 	for p in $$list; do \
 	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
 	  echo "$$d$$p"; \
 	done | $(am__base_list) | \
 	while read files; do \
-	  echo " $(INSTALL_DATA) $$files '$(DESTDIR)$(installdir)'"; \
-	  $(INSTALL_DATA) $$files "$(DESTDIR)$(installdir)" || exit $$?; \
+	  echo " $(INSTALL_DATA) $$files '$(DESTDIR)$(staticdir)'"; \
+	  $(INSTALL_DATA) $$files "$(DESTDIR)$(staticdir)" || exit $$?; \
 	done
 
-uninstall-installDATA:
+uninstall-staticDATA:
 	@$(NORMAL_UNINSTALL)
-	@list='$(install_DATA)'; test -n "$(installdir)" || list=; \
+	@list='$(static_DATA)'; test -n "$(staticdir)" || list=; \
 	files=`for p in $$list; do echo $$p; done | sed -e 's|^.*/||'`; \
-	dir='$(DESTDIR)$(installdir)'; $(am__uninstall_files_from_dir)
-install-servicesDATA: $(services_DATA)
+	dir='$(DESTDIR)$(staticdir)'; $(am__uninstall_files_from_dir)
+install-templDATA: $(templ_DATA)
 	@$(NORMAL_INSTALL)
-	@list='$(services_DATA)'; test -n "$(servicesdir)" || list=; \
+	@list='$(templ_DATA)'; test -n "$(templdir)" || list=; \
 	if test -n "$$list"; then \
-	  echo " $(MKDIR_P) '$(DESTDIR)$(servicesdir)'"; \
-	  $(MKDIR_P) "$(DESTDIR)$(servicesdir)" || exit 1; \
+	  echo " $(MKDIR_P) '$(DESTDIR)$(templdir)'"; \
+	  $(MKDIR_P) "$(DESTDIR)$(templdir)" || exit 1; \
 	fi; \
 	for p in $$list; do \
 	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
 	  echo "$$d$$p"; \
 	done | $(am__base_list) | \
 	while read files; do \
-	  echo " $(INSTALL_DATA) $$files '$(DESTDIR)$(servicesdir)'"; \
-	  $(INSTALL_DATA) $$files "$(DESTDIR)$(servicesdir)" || exit $$?; \
+	  echo " $(INSTALL_DATA) $$files '$(DESTDIR)$(templdir)'"; \
+	  $(INSTALL_DATA) $$files "$(DESTDIR)$(templdir)" || exit $$?; \
 	done
 
-uninstall-servicesDATA:
+uninstall-templDATA:
 	@$(NORMAL_UNINSTALL)
-	@list='$(services_DATA)'; test -n "$(servicesdir)" || list=; \
+	@list='$(templ_DATA)'; test -n "$(templdir)" || list=; \
 	files=`for p in $$list; do echo $$p; done | sed -e 's|^.*/||'`; \
-	dir='$(DESTDIR)$(servicesdir)'; $(am__uninstall_files_from_dir)
+	dir='$(DESTDIR)$(templdir)'; $(am__uninstall_files_from_dir)
+install-webapDATA: $(webap_DATA)
+	@$(NORMAL_INSTALL)
+	@list='$(webap_DATA)'; test -n "$(webapdir)" || list=; \
+	if test -n "$$list"; then \
+	  echo " $(MKDIR_P) '$(DESTDIR)$(webapdir)'"; \
+	  $(MKDIR_P) "$(DESTDIR)$(webapdir)" || exit 1; \
+	fi; \
+	for p in $$list; do \
+	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
+	  echo "$$d$$p"; \
+	done | $(am__base_list) | \
+	while read files; do \
+	  echo " $(INSTALL_DATA) $$files '$(DESTDIR)$(webapdir)'"; \
+	  $(INSTALL_DATA) $$files "$(DESTDIR)$(webapdir)" || exit $$?; \
+	done
+
+uninstall-webapDATA:
+	@$(NORMAL_UNINSTALL)
+	@list='$(webap_DATA)'; test -n "$(webapdir)" || list=; \
+	files=`for p in $$list; do echo $$p; done | sed -e 's|^.*/||'`; \
+	dir='$(DESTDIR)$(webapdir)'; $(am__uninstall_files_from_dir)
 tags TAGS:
 
 ctags CTAGS:
@@ -359,7 +387,7 @@ check-am: all-am
 check: check-am
 all-am: Makefile $(DATA)
 installdirs:
-	for dir in "$(DESTDIR)$(installdir)" "$(DESTDIR)$(servicesdir)"; do \
+	for dir in "$(DESTDIR)$(staticdir)" "$(DESTDIR)$(templdir)" "$(DESTDIR)$(webapdir)"; do \
 	  test -z "$$dir" || $(MKDIR_P) "$$dir"; \
 	done
 install: install-am
@@ -412,7 +440,8 @@ info: info-am
 
 info-am:
 
-install-data-am: install-installDATA install-servicesDATA
+install-data-am: install-staticDATA install-templDATA \
+	install-webapDATA
 
 install-dvi: install-dvi-am
 
@@ -456,7 +485,8 @@ ps: ps-am
 
 ps-am:
 
-uninstall-am: uninstall-installDATA uninstall-servicesDATA
+uninstall-am: uninstall-staticDATA uninstall-templDATA \
+	uninstall-webapDATA
 
 .MAKE: install-am install-strip
 
@@ -465,12 +495,13 @@ uninstall-am: uninstall-installDATA uninstall-servicesDATA
 	html-am info info-am install install-am install-data \
 	install-data-am install-dvi install-dvi-am install-exec \
 	install-exec-am install-html install-html-am install-info \
-	install-info-am install-installDATA install-man install-pdf \
-	install-pdf-am install-ps install-ps-am install-servicesDATA \
-	install-strip installcheck installcheck-am installdirs \
-	maintainer-clean maintainer-clean-generic mostlyclean \
-	mostlyclean-generic pdf pdf-am ps ps-am tags-am uninstall \
-	uninstall-am uninstall-installDATA uninstall-servicesDATA
+	install-info-am install-man install-pdf install-pdf-am \
+	install-ps install-ps-am install-staticDATA install-strip \
+	install-templDATA install-webapDATA installcheck \
+	installcheck-am installdirs maintainer-clean \
+	maintainer-clean-generic mostlyclean mostlyclean-generic pdf \
+	pdf-am ps ps-am tags-am uninstall uninstall-am \
+	uninstall-staticDATA uninstall-templDATA uninstall-webapDATA
 
 .PRECIOUS: Makefile
 

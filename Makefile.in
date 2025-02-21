@@ -258,6 +258,7 @@ htmldir = @htmldir@
 includedir = @includedir@
 infodir = @infodir@
 install_sh = @install_sh@
+installdir = @installdir@
 libdir = @libdir@
 libexecdir = @libexecdir@
 localedir = @localedir@
@@ -284,8 +285,7 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-webapdir = @webapdir@
-SUBDIRS = src
+SUBDIRS = src src/webserver
 all: all-recursive
 
 .SUFFIXES:

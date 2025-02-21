@@ -5,9 +5,6 @@ LABEL maintainer="Rob Knop <rknop@pobox.com>"
 
 SHELL ["/bin/bash", "-c"]
 
-RUN mkdir -p /flask
-WORKDIR /flask
-
 ENV DEBIAN_FRONTEND="noninteractive"
 ENV TZ="UTC"
 
@@ -82,6 +79,10 @@ FROM base AS shell
 COPY --from=build /venv/ /venv/
 ENV PATH=/venv/bin:$PATH
 
+RUN mkdir -p /fastdb/webserver
+ENV PYTHONPATH=/fastdb
+WORKDIR /fastdb/webserver
+
 ENTRYPOINT [ "tail", "-f", "/etc/issue" ]
 
 # ======================================================================
@@ -90,6 +91,10 @@ FROM base AS webserver
 
 COPY --from=build /venv/ /venv/
 ENV PATH=/venv/bin:$PATH
+
+RUN mkdir -p /fastdb/webserver
+ENV PYTHONPATH=/fastdb
+WORKDIR /fastdb/webserver
 
 RUN mkdir /sessions
 

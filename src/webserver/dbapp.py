@@ -6,8 +6,8 @@ import flask
 import psycopg2
 
 import db
-from server import BaseView
 from util import asUUID
+from webserver.server import BaseView
 
 
 # ======================================================================]

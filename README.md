@@ -1,21 +1,28 @@
 # FASTDB
-Development of the Fast Access to Survey Transients Database (FASTDB) 
+Development of the Fast Access to Survey Transients Database (FASTDB).
 
 
 ## Rob Notes
 
-This needs to be moved somewhere better.
+This README file needs to be orgnized better.
 
 ### Building for tests
 
+If you've edited `configure.ac` or any of the `Makefile.am` files, run
 ```
-./configure --with-webapdir=$PWD/install/webap \
+autoreconf --install
+```
+
+Then, run
+
+```
+./configure --with-installdir=$PWD/install \
             --with-smtp-server=mailhog \
             --with-smtp-port=1025
 make install
 ```
 
-Should put lots of stuff underneath `install/webap`.
+Should put lots of stuff underneath `install`.
 
 
             

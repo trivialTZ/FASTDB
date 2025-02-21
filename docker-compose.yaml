@@ -14,6 +14,7 @@ services:
       - type: bind
         source: tests/secrets
         target: /secrets
+        read_only: true
     healthcheck:
       test: netcat -w 1 localhost 5432 || exit 1
       interval: 5s
@@ -24,9 +25,10 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    image: ${DOCKER_ARCHIVE:-registry.nersc.gov/m1727/rkanop}/fastdb-shell:${DOCKER_VERSION:-latest}
+    image: ${DOCKER_ARCHIVE:-registry.nersc.gov/m1727/raknop}/fastdb-shell:${DOCKER_VERSION:-latest}
     build:
       context: ./docker/webserver
+    user: ${USERID:-0}:${GROUPID:-0}
     volumes:
       - type: bind
         source: .
@@ -52,9 +54,10 @@ services:
       - type: bind
         source: tests/secrets
         target: /secrets
+        read_only: true
       - type: bind
-        source: install/webap
-        target: /flask
+        source: install
+        target: /fastdb
       - type: volume
         source: query_results
         target: /query_results
@@ -82,12 +85,13 @@ services:
       - type: bind
         source: tests/secrets
         target: /secrets
+        read_only: true
       - type: bind
         source: .
         target: /code
       - type: bind
-        source: install/webap
-        target: /flask
+        source: install
+        target: /fastdb
       - type: volume
         source: sessions
         target: /sessions
@@ -113,18 +117,17 @@ services:
       context: ./docker/webserver
       target: shell
     user: ${USERID:-0}:${GROUPID:-0}
-    environment:
-      - PYTHONPATH=/flask
     volumes:
       - type: bind
         source: tests/secrets
         target: /secrets
+        read_only: true
       - type: bind
         source: .
         target: /code
       - type: bind
-        source: install/webap
-        target: /flask
+        source: install
+        target: /fastdb
       - type: volume
         source: sessions
         target: /sessions

@@ -3,13 +3,14 @@ AM_INIT_AUTOMAKE([foreign])
 AC_CONFIG_FILES([
   Makefile
   src/Makefile
-  src/apconfig.py
+  src/webserver/Makefile
+  src/config.py
 ])
 
-AC_ARG_WITH( webapdir,
-             [AS_HELP_STRING([--with-webapdir=DIR], [Directory to install webap to [/var/www/html]])],
-             [webapdir=$withval],
-             [webapdir=/var/www/html] )
+AC_ARG_WITH( installdir,
+             [AS_HELP_STRING([--with-webapdir=DIR], [Directory to install to [install]])],
+             [installdir=$withval],
+             [installdir=/usr/local/fastdb] )
 
 AC_ARG_WITH( dbhost,
              [AS_HELP_STRING([--with-dbhost=HOST], [Postgres host [postgres]])],
@@ -62,7 +63,7 @@ AC_ARG_WITH( smtp-password,
              [smtppassword=$withval],
              [smtppassword=None] )
 
-AC_SUBST(webapdir)
+AC_SUBST(installdir)
 AC_SUBST(dbhost)
 AC_SUBST(dbport)
 AC_SUBST(dbdatabase)

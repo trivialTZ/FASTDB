@@ -17,10 +17,6 @@ RUN  apt-get update \
 RUN ln -s /usr/bin/python3 /usr/bin/python
 ENV LESS=-XLRi
 
-# This will bind-mount the same flask directory as the webserver
-RUN mkdir /flask
-WORKDIR /flask
-
 # ======================================================================
 FROM base AS build
 
@@ -44,4 +40,8 @@ FROM base AS queryrunner
 COPY --from=build /venv/ /venv/
 ENV PATH=/venv/bin:$PATH
 
-ENTRYPOINT [ "python", "/flask/long_query_runner.py", "--loop", "--sleep-time", "10", "--num-runners", "10" ]
+RUN mkdir /fastdb
+ENV PYTHONPATH=/fastdb
+WORKDIR /fastdb/services
+
+ENTRYPOINT [ "python", "long_query_runner.py", "--loop", "--sleep-time", "10", "--num-runners", "10" ]
