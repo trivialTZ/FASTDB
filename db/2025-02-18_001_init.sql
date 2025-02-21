@@ -41,6 +41,53 @@ CREATE TABLE snapshot(
 CREATE UNIQUE INDEX idx_snapshot_desc ON snapshot(description);
 
 
+-- This table is based on the Object table in section 4.3.1 of the DPDD
+-- (revision 2023-07-10).
+-- NOTE : the quantiles predicted in that document are 1, 5, 25, 50, 75, and 99.
+--   Here, we have the ones that are in SNANA ELASTICC
+-- NOTE 2 : psra ad psdec are not the right things to use.
+--   but, use them for now.
+CREATE TABLE host_galaxy(
+  id UUID PRIMARY KEY NOT NULL DEFAULT gen_random_uuid(),
+  processing_version integer NOT NULL,
+  objectid bigint NOT NULL,
+  psradectai real,
+  psra double precision,
+  psdec double precision,
+  stdcolor_u real,
+  stdcolor_g real,
+  stdcolor_r real,
+  stdcolor_i real,
+  stdcolor_z real,
+  stdcolor_y real,
+  stdcolor_u_err real,
+  stdcolor_g_err real,
+  stdcolor_r_err real,
+  stdcolor_i_err real,
+  stdcolor_z_err real,
+  stdcolor_y_err real,
+  pzmode real,
+  pzmean real,
+  pzstd real,
+  pzskew real,
+  pskurt real,
+  pzquant000 real,
+  pzquant010 real,
+  pzquant020 real,
+  pzquant030 real,
+  pzquant040 real,
+  pzquant050 real,
+  pzquant060 real,
+  pzquant070 real,
+  pzquant080 real,
+  pzquant090 real,
+  pzquant100 real,
+  flags bigint
+);
+CREATE INDEX idx_hostgalaxy_objectid ON host_galaxy(objectid);
+CREATE INDEX idx_hostgalaxy_q3c ON host_galaxy(q3c_ang2ipix(psra, psdec));
+
+
 -- Selected from the APDB table from
 --   https://sdm-schemas.lsst.io/apdb.html
 -- NOTE: diaobjectid was convereted to bigint from long
@@ -63,11 +110,14 @@ CREATE TABLE diaobject(
   dec double precision NOT NULL,
   decerr real,
   ra_dec_cov real,
-  nearbyextobj1 integer,
+  nearbyextobj1 bigint,
+  nearbyextobj1id UUID,
   nearbyextobj1sep real,
-  nearbyextobj2 integer,
+  nearbyextobj2 bigint,
+  nearbyextobj2id UUID,
   nearbyextobj2sep real,
-  nearbyextobj3 integer,
+  nearbyextobj3 bigint,
+  nearbyextobj3id UUID,
   nearbyextobj3sep real,
   nearbylowzgal text,
   nearbylowzgalsep real,
@@ -86,6 +136,12 @@ CREATE INDEX idx_diaobject_diaobjectid ON diaobject(diaobjectid);
 CREATE INDEX idx_diaobject_procver ON diaobject(processing_version);
 ALTER TABLE diaobject ADD CONSTRAINT fk_diaobject_procver
   FOREIGN KEY (processing_version) REFERENCES processing_version(id) ON DELETE RESTRICT;
+ALTER TABLE diaobject ADD CONSTRAINT fk_diaobject_nearbyext1
+  FOREIGN KEY (nearbyextobj1id) REFERENCES host_galaxy(id) ON DELETE SET NULL;
+ALTER TABLE diaobject ADD CONSTRAINT fk_diaobject_nearbyext2
+  FOREIGN KEY (nearbyextobj2id) REFERENCES host_galaxy(id) ON DELETE SET NULL;
+ALTER TABLE diaobject ADD CONSTRAINT fk_diaobject_nearbyext3
+  FOREIGN KEY (nearbyextobj3id) REFERENCES host_galaxy(id) ON DELETE SET NULL;
 
 -- Selected from DiaSource APDB table
 -- Flags converted to the flags bitfield:

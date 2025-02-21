@@ -10,4 +10,4 @@ def asUUID( id ):
         raise ValueError( f"Don't know how to turn {id} into UUID." )
 
 
-_NULLUUID = asUUID( '00000000-0000-0000-0000-000000000000' )
+NULLUUID = asUUID( '00000000-0000-0000-0000-000000000000' )

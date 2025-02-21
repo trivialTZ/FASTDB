@@ -5,6 +5,8 @@
 #
 # WARNING : code assumes all column names are lowercase.  Don't mix case in column names.
 
+# import sys
+# import os
 import io
 import uuid
 import collections
@@ -30,6 +32,26 @@ dbuser = config.dbuser
 dbname = config.dbdatabase
 
 psycopg2.extensions.register_adapter(dict, psycopg2.extras.Json)
+
+
+# For multiprcoessing debugging
+# import pdb
+# class ForkablePdb(pdb.Pdb):
+#     _original_stdin_fd = sys.stdin.fileno()
+#     _original_stdin = None
+
+#     def __init__(self):
+#         pdb.Pdb.__init__(self, nosigint=True)
+
+#     def _cmdloop(self):
+#         current_stdin = sys.stdin
+#         try:
+#             if not self._original_stdin:
+#                 self._original_stdin = os.fdopen(self._original_stdin_fd)
+#             sys.stdin = self._original_stdin
+#             self.cmdloop()
+#         finally:
+#             sys.stdin = current_stdin
 
 
 # ======================================================================
@@ -435,7 +457,7 @@ class DBBase:
                     self.refresh( con )
 
     @classmethod
-    def bulk_insert_or_upsert( cls, data, upsert=False, assume_no_conflict=False, dbcon=None ):
+    def bulk_insert_or_upsert( cls, data, upsert=False, assume_no_conflict=False, dbcon=None, nocommit=False ):
         """Try to efficiently insert a bunch of data into the database.
 
         Parmeters
@@ -469,10 +491,25 @@ class DBBase:
              where the conflict clauses cause the sql to fail.  Set this
              to True to avoid having those clauses.
 
+          nocommit : bool, default False
+             This one is very scary and you should only use it if you
+             really know what you're doing.  If this is True, not only
+             will we not commit to the database, but we won't copy from
+             the table temp_bulk_upsert to the table of interest.  It
+             doesn't makje sense to set this to True unless you also
+             pass a dbcon.  This is for things that want to do stuff to
+             the temp table before copying it over to the main table, in
+             which case it's the caller's responsibility to do that copy
+             and commit to the database.
+
         Returns
         -------
-           inserted: int
-             The number of rows actually inserted (which may be less than len(data)).
+           int OR string
+             If nocommit=False, returns the number of rows actually
+             inserted (which may be less than len(data)).
+
+             If nocommit=True, returns the string to execute to copy
+             from the temp table to the final table.
 
         """
 
@@ -499,12 +536,17 @@ class DBBase:
                                  + ",".join( f"{c}=EXCLUDED.{c}" for c in columns ) )
             else:
                 conflict = ""
+
             q = f"INSERT INTO {cls.__tablename__} SELECT * FROM temp_bulk_upsert {conflict}"
-            cursor.execute( q )
-            ninserted = cursor.rowcount
-            cursor.execute( "DROP TABLE temp_bulk_upsert" )
-            con.commit()
-            return ninserted
+
+            if nocommit:
+                return q
+            else:
+                cursor.execute( q )
+                ninserted = cursor.rowcount
+                cursor.execute( "DROP TABLE temp_bulk_upsert" )
+                con.commit()
+                return ninserted
 
 
 # ======================================================================
@@ -538,6 +580,14 @@ class ProcessingVersion( DBBase ):
 
 class Snapshot( DBBase ):
     __tablename__ = "snapshot"
+    _tablemeta = None
+    _pk = [ 'id' ]
+
+
+# ======================================================================
+
+class HostGalaxy( DBBase ):
+    __tablename__ = "host_galaxy"
     _tablemeta = None
     _pk = [ 'id' ]
 
@@ -588,8 +638,8 @@ class QueryQueue( DBBase ):
     _tablemeta = None
     _pk = [ 'queryid' ]
 
-    # Need some special handling of array attributes, until such a time
-    #   as I build that into DBBase
+    # Need some special handling of array of json attributes, until such a time
+    #   as I build that into DBBase (which probably isn't worth the effort).
 
     def insert( self, dbcon=None, refresh=True, nocommit=False ):
         if refresh and nocommit:
