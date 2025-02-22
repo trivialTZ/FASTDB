@@ -18,7 +18,7 @@ ENV TZ="UTC"
 RUN  apt-get update \
     && apt-get -y upgrade \
     && apt-get -y install -y \
-         python3 tmux netcat-openbsd curl elinks postgresql-client make \
+         python3 tmux netcat-openbsd curl elinks postgresql-client make rlwrap socat \
     && apt-get -y autoremove \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
@@ -54,28 +54,31 @@ RUN source /venv/bin/activate && \
        pytest-timestamper \
        python-dateutil \
        pytz \
+       remote-pdb \
        requests \
        simplejson
 
 # ======================================================================
-# This is for the test webserver.  It installs crappy keys
+# This is for the test webserver.  It installs crappy keys so you
+#   can connect via https.
 # The production webserver is going to be on Spin and won't do
-# key management iteslf
+#   SSL management itself (the spin ingress handles that).
 FROM base AS test
 
 COPY --from=build /venv/ /venv/
 ENV PATH=/venv/bin:$PATH
 
+RUN mkdir -p /fastdb/webserver
+ENV PYTHONPATH=/fastdb
+WORKDIR /fastdb/webserver
+
 RUN mkdir /sessions
-# This looks horrible, but it's a container, so no big deal.
-# If it's a bind-mount, it won't affect the permissions of
-#   the thing being bind-mounted.
-RUN chmod a+rwx /sessions
 
 COPY docker_flask/createdb.py /usr/src/createdb.py
 COPY docker_flask/key.pem /usr/src/key.pem
 COPY docker_flask/cert.pem /usr/src/cert.pem
 
+EXPOSE 8080
 ENTRYPOINT [ "gunicorn", "--certfile", "/usr/src/cert.pem", "--keyfile", "/usr/src/key.pem", \
            "-w", "1", "--threads", "10", "-b", "0.0.0.0:8080", "--timeout", "0", "server:app" ]
 

@@ -16,7 +16,7 @@ def main():
     parser.add_argument( '-p', '--password', default="fragile", help="Postgres password" )
     args = parser.parse_args()
 
-    direc = pathlib.Path( "." )
+    direc = pathlib.Path( __file__ ).parent
     sqlfiles = list( direc.glob( "*.sql" ) )
     sqlfiles.sort()
 

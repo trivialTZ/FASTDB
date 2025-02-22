@@ -23,28 +23,6 @@ from db import ( DB, HostGalaxy, DiaObject, DiaSource, DiaForcedSource,
                  DiaSourceSnapshot, DiaForcedSourceSnapshot )
 
 
-
-# For multiprcoessing debugging
-# import pdb
-# class ForkablePdb(pdb.Pdb):
-
-#     _original_stdin_fd = sys.stdin.fileno()
-#     _original_stdin = None
-
-#     def __init__(self):
-#         pdb.Pdb.__init__(self, nosigint=True)
-
-#     def _cmdloop(self):
-#         current_stdin = sys.stdin
-#         try:
-#             if not self._original_stdin:
-#                 self._original_stdin = os.fdopen(self._original_stdin_fd)
-#             sys.stdin = self._original_stdin
-#             self.cmdloop()
-#         finally:
-#             sys.stdin = current_stdin
-
-
 # ======================================================================
 
 class ColumnMapper:
@@ -201,19 +179,36 @@ class FITSFileHandler( ColumnMapper ):
             head.add_column( str(NULLUUID), name='nearbyextobj2id' )
             if 'nearbyextobj3' in head.columns:
                 head.add_column( str(NULLUUID), name='nearbyextobj3id' )
+            # By construction, in each of the joins below, joint should
+            #   have w rows.  hostgal was selected from all the known
+            #   nearbyextobj* in the HEAD file, and was made unique.
+            # So, when we are done, everything with a nearbyextobj{n}
+            #   that is >=0 should have a non-NULL uuid in
+            #   nearbyextobj{n}id.
+            # The bigger worry is that different HEAD files will use the
+            #   same hostgal more than once.  In that case, the same
+            #   hostgal will show up with different uuids.  The database
+            #   structure sould be OK with that (since there's no unique
+            #   constraint on (objectid, processing_version)), but it
+            #   would be better to identify the same host gal as the
+            #   same host gal!
+            # For handling actual alerts, we need to be able to do this
+            #   better, as we're already going to need to be able to
+            #   handle repeated reports of the same sources, never mind
+            #   host galaxies.
             w = np.where( head['nearbyextobj1'] > 0 )[0]
             if len(w) > 0:
                 joint = astropy.table.join( head[w], hostgal, keys_left='nearbyextobj1', keys_right=['objectid'] )
-                head[w]['nearbyextobj1id'] = joint['id_2']
+                head['nearbyextobj1id'][w] = joint['id_2']
             w = np.where( head['nearbyextobj2'] > 0 )[0]
             if len(w) > 0:
                 joint = astropy.table.join( head[w], hostgal, keys_left='nearbyextobj2', keys_right=['objectid'] )
-                head[w]['nearbyextobj2id'] = joint['id_2']
+                head['nearbyextobj2id'][w] = joint['id_2']
             if 'nearbyextobj3' in head.columns:
                 w = np.where( head['nearbyextobj3'] > 0 )[0]
                 if len(w) > 0:
                     joint = astropy.table.join( head[w], hostgal, keys_left='nearbyextobj3', keys_right=['objectid'] )
-                    head[w]['nearbyextobj3id'] = joint['id_3']
+                    head['nearbyextobj3id'][w] = joint['id_2']
 
             head.add_column( self.processing_version, name='processing_version' )
 
