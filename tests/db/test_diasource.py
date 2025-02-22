@@ -13,8 +13,8 @@ class TestDiaSource( BaseTestDB ):
         self.columns = {
             'diasourceid',
             'processing_version',
-            'diaobjectuuid',
             'diaobjectid',
+            'diaobject_procver',
             'ssobjectid',
             'visit',
             'detector',
@@ -119,7 +119,8 @@ class TestDiaSource( BaseTestDB ):
 
         self.obj1 = DiaSource( diasourceid=1,
                                processing_version=procver1.id,
-                               diaobjectuuid=obj1.id,
+                               diaobjectid=obj1.diaobjectid,
+                               diaobject_procver=obj1.processing_version,
                                visit=1,
                                detector=1,
                                band='r',
@@ -132,7 +133,8 @@ class TestDiaSource( BaseTestDB ):
         self.dict1 = { k: getattr( self.obj1, k ) for k in self.columns }
         self.obj2 = DiaSource( diasourceid=2,
                                processing_version=procver1.id,
-                               diaobjectuuid=obj1.id,
+                               diaobjectid=obj1.diaobjectid,
+                               diaobject_procver=obj1.processing_version,
                                visit=2,
                                detector=2,
                                band='i',
@@ -145,7 +147,8 @@ class TestDiaSource( BaseTestDB ):
         self.dict2 = { k: getattr( self.obj2, k ) for k in self.columns }
         self.dict3 = { 'diasourceid': 3,
                        'processing_version': procver1.id,
-                       'diaobjectuuid': obj1.id,
+                       'diaobjectid': obj1.diaobjectid,
+                       'diaobject_procver': obj1.processing_version,
                        'visit': 3,
                        'detector': 3,
                        'band': 'g',

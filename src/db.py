@@ -594,10 +594,26 @@ class HostGalaxy( DBBase ):
 
 # ======================================================================
 
+class RootDiaObject( DBBase ):
+    __tablename__ = "root_diaobject"
+    _tablemeta = None
+    _pk = [ 'id' ]
+
+
+# ======================================================================
+
 class DiaObject( DBBase ):
     __tablename__ = "diaobject"
     _tablemeta = None
-    _pk = [ 'id' ]
+    _pk = [ 'diaobjectid', 'processing_version' ]
+
+
+# ======================================================================
+
+class DiaObjectRootMap( DBBase ):
+    __tablename__ = "diaobject_root_map"
+    _tablemeta = None
+    _pk = [ 'rootid', 'diaobjectid', 'processing_version' ]
 
 
 # ======================================================================
@@ -614,6 +630,14 @@ class DiaForcedSource( DBBase ):
     __tablename__ = "diaforcedsource"
     _tablemeta = None
     _pk = [ 'diaforcedsourceid', 'processing_version' ]
+
+
+# ======================================================================
+
+class DiaObjectSnapshot( DBBase ):
+    __tablename__ = "diaobject_snapshot"
+    _tablemeta = None
+    _pk = [ 'diaobjectid', 'processing_vesion', 'snapshot' ]
 
 
 # ======================================================================

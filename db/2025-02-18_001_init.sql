@@ -88,6 +88,14 @@ CREATE INDEX idx_hostgalaxy_objectid ON host_galaxy(objectid);
 CREATE INDEX idx_hostgalaxy_q3c ON host_galaxy(q3c_ang2ipix(psra, psdec));
 
 
+CREATE TABLE root_diaobject(
+  id UUID NOT NULL PRIMARY KEY
+  -- Do we want more columns?  Store "official" ra/dec, nearby objects, etc?
+  --   Probably official ra/dec should be in another table so it can
+  --   be updated and updates can be tracked.
+);
+
+
 -- Selected from the APDB table from
 --   https://sdm-schemas.lsst.io/apdb.html
 -- NOTE: diaobjectid was convereted to bigint from long
@@ -99,9 +107,8 @@ CREATE INDEX idx_hostgalaxy_q3c ON host_galaxy(q3c_ang2ipix(psra, psdec));
 --   diaobjects and identifies them all as
 --   the same thing
 CREATE TABLE diaobject(
-  id UUID PRIMARY KEY NOT NULL DEFAULT gen_random_uuid(),
-  processing_version integer NOT NULL,
   diaobjectid bigint NOT NULL,
+  processing_version integer NOT NULL,
   radecmjdtai real,
   validitystart timestamp with time zone,
   validityend timestamp with time zone,
@@ -129,7 +136,9 @@ CREATE TABLE diaobject(
   pmdec real,
   pmdecerr real,
   pmdec_parallax_cov real,
-  pm_ra_dec_cov real
+  pm_ra_dec_cov real,
+
+  PRIMARY KEY (diaobjectid, processing_version)
 );
 CREATE INDEX idx_diaobject_q3c ON diaobject (q3c_ang2ipix(ra, dec));
 CREATE INDEX idx_diaobject_diaobjectid ON diaobject(diaobjectid);
@@ -142,6 +151,22 @@ ALTER TABLE diaobject ADD CONSTRAINT fk_diaobject_nearbyext2
   FOREIGN KEY (nearbyextobj2id) REFERENCES host_galaxy(id) ON DELETE SET NULL;
 ALTER TABLE diaobject ADD CONSTRAINT fk_diaobject_nearbyext3
   FOREIGN KEY (nearbyextobj3id) REFERENCES host_galaxy(id) ON DELETE SET NULL;
+
+
+CREATE TABLE diaobject_root_map(
+  rootid UUID NOT NULL,
+  diaobjectid bigint NOT NULL,
+  processing_version integer NOT NULL,
+  PRIMARY KEY ( rootid, diaobjectid, processing_version )
+);
+CREATE INDEX idx_diaobject_root_map_rootid ON diaobject_root_map(rootid);
+CREATE INDEX idx_diaobject_root_map_diaobjectid ON diaobject_root_map(diaobjectid);
+CREATE INDEX idx_diaobject_root_map_procver ON diaobject_root_map(processing_version);
+ALTER TABLE diaobject_root_map ADD CONSTRAINT fk_diobjrmap_rootid
+  FOREIGN KEY (rootid) REFERENCES root_diaobject(id) ON DELETE RESTRICT;
+ALTER TABLE diaobject_root_map ADD CONSTRAINT fk_diobjrmap_diaobject
+  FOREIGN KEY (diaobjectid,processing_version) REFERENCES diaobject(diaobjectid,processing_version)
+  ON DELETE CASCADE;
 
 -- Selected from DiaSource APDB table
 -- Flags converted to the flags bitfield:
@@ -182,8 +207,8 @@ ALTER TABLE diaobject ADD CONSTRAINT fk_diaobject_nearbyext3
 CREATE TABLE diasource(
   diasourceid bigint NOT NULL,
   processing_version integer NOT NULL,
-  diaobjectuuid UUID,
-  diaobjectid bigint,
+  diaobjectid bigint NOT NULL,
+  diaobject_procver integer NOT NULL,
   ssobjectid bigint,
   visit integer NOT NULL,
   detector smallint NOT NULL,
@@ -250,9 +275,9 @@ CREATE INDEX idx_diasource_visit ON diasource(visit);
 CREATE INDEX idx_diasource_detector ON diasource(detector);
 CREATE INDEX idx_diasource_band ON diasource(band);
 CREATE INDEX idx_diasource_mjd ON diasource(midpointmjdtai);
-CREATE INDEX idx_diasource_diaobjectid ON diasource(diaobjectuuid);
-ALTER TABLE diasource ADD CONSTRAINT fk_diasource_diaobjectid
-  FOREIGN KEY (diaobjectuuid) REFERENCES diaobject(id) ON DELETE CASCADE;
+CREATE INDEX idx_diasource_diaobjectidpv ON diasource(diaobjectid,diaobject_procver);
+ALTER TABLE diasource ADD CONSTRAINT fk_diasource_diaobject
+  FOREIGN KEY (diaobjectid,diaobject_procver) REFERENCES diaobject(diaobjectid,processing_version) ON DELETE CASCADE;
 CREATE INDEX idx_diasource_procver ON diasource(processing_version);
 ALTER TABLE diasource ADD CONSTRAINT fk_diasource_procver
   FOREIGN KEY (processing_version) REFERENCES processing_version(id) ON DELETE RESTRICT;
@@ -263,8 +288,9 @@ CREATE TABLE diasource_default PARTITION OF diasource DEFAULT;
 -- Selected from DiaForcedSource APDB table
 CREATE TABLE diaforcedsource (
   diaforcedsourceid bigint NOT NULL,
-  diaobjectuuid UUID NOT NULL,
   processing_version integer NOT NULL,
+  diaobjectid bigint NOT NULL,
+  diaobject_procver integer NOT NULL,
   visit integer NOT NULL,
   detector smallint NOT NULL,
   midpointmjdtai double precision NOT NULL,
@@ -287,13 +313,29 @@ CREATE INDEX idx_diaforcedsource_visit ON diaforcedsource(visit);
 CREATE INDEX idx_diaforcedsource_detector ON diaforcedsource(detector);
 CREATE INDEX idx_diaforcedsource_mjdtai ON diaforcedsource(midpointmjdtai);
 CREATE INDEX idx_diaforcedsource_band ON diaforcedsource(band);
-ALTER TABLE diaforcedsource ADD CONSTRAINT fk_diaforcedsource_diaobjectid
-  FOREIGN KEY (diaobjectuuid) REFERENCES diaobject(id) ON DELETE CASCADE;
+CREATE INDEX idx_diaforcedsource_diaobjectidpv ON diaforcedsource(diaobjectid,diaobject_procver);
+ALTER TABLE diaforcedsource ADD CONSTRAINT fk_diaforcedsource_diaobject
+  FOREIGN KEY (diaobjectid,diaobject_procver) REFERENCES diaobject(diaobjectid,processing_version) ON DELETE CASCADE;
 CREATE INDEX idx_diaforcedsource_procver ON diaforcedsource(processing_version);
 ALTER TABLE diaforcedsource ADD CONSTRAINT fk_diaforcedsource_procver
   FOREIGN KEY (processing_version) REFERENCES processing_version(id) ON DELETE RESTRICT;
 
 CREATE TABLE diaforcedsource_default PARTITION OF diaforcedsource DEFAULT;
+
+
+CREATE TABLE diaobject_snapshot(
+  diaobjectid bigint NOT NULL,
+  processing_version integer NOT NULL,
+  snapshot integer NOT NULL,
+  PRIMARY KEY(diaobjectid, processing_version, snapshot)
+);
+CREATE INDEX ix_doss_diaobject ON diaobject_snapshot(diaobjectid,processing_Version);
+CREATE INDEX ix_doss_snapshot ON diaobject_snapshot(snapshot);
+ALTER TABLE diaobject_snapshot ADD CONSTRAINT fk_diaobject_snapshot_object
+  FOREIGN KEY (diaobjectid,processing_version) REFERENCES diaobject(diaobjectid,processing_version)
+  ON DELETE CASCADE;
+ALTER TABLE diaobject_snapshot ADD CONSTRAINT fk_diaobject_snapshot_snapshot
+  FOREIGN KEY (snapshot) REFERENCES snapshot(id) ON DELETE CASCADE;
 
 
 CREATE TABLE diasource_snapshot(

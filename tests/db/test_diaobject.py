@@ -1,4 +1,3 @@
-import uuid
 import pytest
 
 from db import DiaObject
@@ -12,9 +11,8 @@ class TestDiaObject( BaseTestDB ):
     def basetest_setup( self, procver1 ):
         self.cls = DiaObject
         self.columns = {
-            'id',
-            'processing_version',
             'diaobjectid',
+            'processing_version',
             'radecmjdtai',
             'validitystart',
             'validityend',
@@ -23,10 +21,13 @@ class TestDiaObject( BaseTestDB ):
             'dec',
             'decerr',
             'ra_dec_cov',
+            'nearbyextobj1id',
             'nearbyextobj1',
             'nearbyextobj1sep',
+            'nearbyextobj2id',
             'nearbyextobj2',
             'nearbyextobj2sep',
+            'nearbyextobj3id',
             'nearbyextobj3',
             'nearbyextobj3sep',
             'nearbylowzgal',
@@ -69,23 +70,20 @@ class TestDiaObject( BaseTestDB ):
         ]
         self.uniques = []
 
-        self.obj1 = DiaObject( id=uuid.uuid4(),
+        self.obj1 = DiaObject( diaobjectid=1,
                                processing_version=procver1.id,
-                               diaobjectid=1,
                                radecmjdtai=60000.,
                                ra=42.,
                                dec=128. )
         self.dict1 = { k: getattr( self.obj1, k ) for k in self.columns }
-        self.obj2 = DiaObject( id=uuid.uuid4(),
+        self.obj2 = DiaObject( diaobjectid=2,
                                processing_version=procver1.id,
-                               diaobjectid=2,
                                radecmjdtai=61000.,
                                ra=23.,
                                dec=-42. )
         self.dict2 = { k: getattr( self.obj2, k ) for k in self.columns }
-        self.dict3 = { 'id': uuid.uuid4(),
+        self.dict3 = { 'diaobjectid': 3,
                        'processing_version': procver1.id,
-                       'diaobjectid': 3,
                        'radecmjdtai': 62000.,
                        'ra': 64.,
                        'dec': -23. }

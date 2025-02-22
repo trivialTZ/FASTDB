@@ -20,7 +20,7 @@ import astropy.table
 from fastdb_loader import FastDBLoader
 from util import NULLUUID
 from db import ( DB, HostGalaxy, DiaObject, DiaSource, DiaForcedSource,
-                 DiaSourceSnapshot, DiaForcedSourceSnapshot )
+                 DiaObjectSnapshot, DiaSourceSnapshot, DiaForcedSourceSnapshot )
 
 
 # ======================================================================
@@ -157,8 +157,9 @@ class FITSFileHandler( ColumnMapper ):
 
             phot = astropy.table.Table.read( photfile )
 
-            # Build the hostgal table from the DiaObject table
+            # Load the host_galaxy and diaobject tables, both built from the head file
 
+            # Build the hostgal table in hostgal
             hostgal1 = astropy.table.Table( orig_head )
             self.hostgalaxy_map_columns( 1, hostgal1 )
             hostgal2 = astropy.table.Table( orig_head )
@@ -171,10 +172,10 @@ class FITSFileHandler( ColumnMapper ):
             hostgal.add_column( [ str(uuid.uuid4()) for i in range(len(hostgal)) ], name='id' )
             hostgal.add_column( self.processing_version, name='processing_version' )
 
-            # Load the DiaObject table
+            # Build the diaobject table in head
             self.diaobject_map_columns( head )
+            head.add_column( self.processing_version, name='processing_version' )
 
-            head.add_column( [ str(uuid.uuid4()) for i in range(len(head)) ], name='id' )
             head.add_column( str(NULLUUID), name='nearbyextobj1id' )
             head.add_column( str(NULLUUID), name='nearbyextobj2id' )
             if 'nearbyextobj3' in head.columns:
@@ -189,9 +190,9 @@ class FITSFileHandler( ColumnMapper ):
             #   same hostgal more than once.  In that case, the same
             #   hostgal will show up with different uuids.  The database
             #   structure sould be OK with that (since there's no unique
-            #   constraint on (objectid, processing_version)), but it
-            #   would be better to identify the same host gal as the
-            #   same host gal!
+            #   constraint on (objectid, processing_version) in
+            #   host_galaxy), but it would be better to identify the
+            #   same host gal as the same host gal!
             # For handling actual alerts, we need to be able to do this
             #   better, as we're already going to need to be able to
             #   handle repeated reports of the same sources, never mind
@@ -199,18 +200,16 @@ class FITSFileHandler( ColumnMapper ):
             w = np.where( head['nearbyextobj1'] > 0 )[0]
             if len(w) > 0:
                 joint = astropy.table.join( head[w], hostgal, keys_left='nearbyextobj1', keys_right=['objectid'] )
-                head['nearbyextobj1id'][w] = joint['id_2']
+                head['nearbyextobj1id'][w] = joint['id']
             w = np.where( head['nearbyextobj2'] > 0 )[0]
             if len(w) > 0:
                 joint = astropy.table.join( head[w], hostgal, keys_left='nearbyextobj2', keys_right=['objectid'] )
-                head['nearbyextobj2id'][w] = joint['id_2']
+                head['nearbyextobj2id'][w] = joint['id']
             if 'nearbyextobj3' in head.columns:
                 w = np.where( head['nearbyextobj3'] > 0 )[0]
                 if len(w) > 0:
                     joint = astropy.table.join( head[w], hostgal, keys_left='nearbyextobj3', keys_right=['objectid'] )
-                    head['nearbyextobj3id'][w] = joint['id_2']
-
-            head.add_column( self.processing_version, name='processing_version' )
+                    head['nearbyextobj3id'][w] = joint['id']
 
             if self.really_do:
                 with DB() as conn:
@@ -233,12 +232,30 @@ class FITSFileHandler( ColumnMapper ):
                     cursor.execute( q )
                     nobj = cursor.rowcount
                     conn.commit()
-                    self.logger.info( f"PID {os.getpid()} loaded {nobj} objects from {headfile.name}" )
+                    self.logger.info( f"PID {os.getpid()} loaded {nhost} hosts and {nobj} objects "
+                                      f"from {headfile.name}" )
 
             else:
                 nhost = len(hostgal)
                 nobj = len(head)
                 self.logger.info( f"PID {os.getpid()} would try to load {nobj} objects and {nhost} host galaxies" )
+
+            # Load the diaobject_snapshot table
+            no_ss = 0
+            if self.snapshot is not None:
+                o_ss = astropy.table.Table()
+                o_ss['diaobjectid'] = head['diaobjectid']
+                o_ss.add_column( self.processing_version, name='processing_version' )
+                o_ss.add_column( self.snapshot, name='snapshot' )
+
+                if self.really_do:
+                    no_ss = DiaObjectSnapshot.bulk_insert_or_upsert( dict(o_ss), assume_no_conflict=True )
+                    self.logger.info( f"PID {os.getpid()} loaded {no_ss} "
+                                      f"DiaObjectSnapshot from {headfile.name}" )
+                else:
+                    no_ss = len( o_ss )
+                    self.logger.info( f"PID {os.getpid()} would try to load {no_ss} rows into diaobject_snapshot" )
+
 
             # Calculate some derived fields we'll need for source and forced sourced tables
             # diasource psfflux is supposed to be in nJY
@@ -252,7 +269,8 @@ class FITSFileHandler( ColumnMapper ):
             phot['FLUXCALERR'] *= 10 ** ( ( 31.4 - self.snana_zeropoint ) / 2.5 )
 
             self.diasource_map_columns( phot )
-            phot.add_column( str(NULLUUID), name='diaobjectuuid' )
+            phot.add_column( np.int64(-1), name='diaobjectid' )
+            phot.add_column( -1, name='diaobject_procver' )
             phot['band'] = [ i.strip() for i in phot['band'] ]
             phot.add_column( np.int64(-1), name='diaforcedsourceid' )
             phot.add_column( self.processing_version, name='processing_version' )
@@ -273,7 +291,8 @@ class FITSFileHandler( ColumnMapper ):
                     self.logger.error( f'SNID {obj["SNID"]} in {headfile.name} has {pmax-pmin+1} sources, '
                                        f'which is more than max_sources_per_object={self.max_sources_per_object}' )
                     raise RuntimeError( "Too many sources" )
-                phot['diaobjectuuid'][pmin:pmax+1] = headrow['id']
+                phot['diaobjectid'][pmin:pmax+1] = headrow['diaobjectid']
+                phot['diaobject_procver'][pmin:pmax+1] = headrow['processing_version']
                 phot['visit'][pmin:pmax+1] = obj['SNID']             # Just something
                 phot['diaforcedsourceid'][pmin:pmax+1] = ( obj['SNID'] * self.max_sources_per_object
                                                            + np.arange( pmax - pmin + 1 ) )
@@ -281,7 +300,7 @@ class FITSFileHandler( ColumnMapper ):
                 phot['dec'][pmin:pmax+1] = obj['DEC']
 
             # The phot table has separators, so there will still be some junk data in there I need to purge
-            phot = phot[ phot['diaobjectuuid'] != str(NULLUUID) ]
+            phot = phot[ phot['diaobjectid'] >= 0 ]
 
             if self.really_do:
                 forcedphot = astropy.table.Table( phot )
@@ -307,7 +326,8 @@ class FITSFileHandler( ColumnMapper ):
                                       f"DiaForcedSourceSnapshot from {photfile.name}" )
                 else:
                     nfs_ss = len( fs_ss )
-                    self.logger.info( f"PID {os.getpid()} would try to load {nfs_ss} rows into DFStoPVtoSS" )
+                    self.logger.info( f"PID {os.getpid()} would try to load {nfs_ss} "
+                                      f"rows into diaforcedsource_snapshot" )
 
             # Load the DiaSource table
             phot.rename_column( 'diaforcedsourceid', 'diasourceid' )
@@ -338,7 +358,8 @@ class FITSFileHandler( ColumnMapper ):
                     self.logger.info( f"PID {os.getpid()} would try to load {ns_ss} rows into DStoPVtoSS" )
 
             return { 'ok': True, 'msg': ( f"Loaded {nobj} objects, {nsrc} sources, {nfrc} forced, "
-                                          f"{nfs_ss} forced_snapshot, {ns_ss} source_snapshot" ) }
+                                          f"{no_ss} object_snapshot, {nfs_ss} forced_snapshot, "
+                                          f"{ns_ss} source_snapshot" ) }
         except Exception:
             self.logger.error( f"Exception loading {headfile}: {traceback.format_exc()}" )
             return { "ok": False, "msg": traceback.format_exc() }
@@ -575,8 +596,10 @@ def main():
                                       epilog="""Load FASTDB tables from SNANA fits files.
 
 Loads the tables host_galaxy, diaobject, diasource, diaforcedsource,
-diasource_snapshot, and diaforcedsource_snapshot.  Also may add a row
-to each of processing_version and snapshot.
+diaobject_snapshot, diasource_snapshot, and diaforcedsource_snapshot.
+Also may add a row to each of processing_version and snapshot.
+
+Does *not* load root_diaobject.
 """
                                       )
     parser.add_argument( '-n', '--nprocs', default=5, type=int,

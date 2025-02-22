@@ -2,7 +2,9 @@ import uuid
 
 
 def asUUID( id ):
-    if isinstance( id, uuid.UUID ):
+    if id is None:
+        return None
+    elif isinstance( id, uuid.UUID ):
         return id
     elif isinstance( id, str ):
         return uuid.UUID( id )

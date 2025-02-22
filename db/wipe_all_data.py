@@ -2,10 +2,11 @@
 
 # Empty out all data tables, don't remove users
 data_tables = [ 'processing_version', 'snapshot',
-                'host_galaxy', 'diaobject', 'diasource', 'diaforcedsource',
-                'diasource_snapshot', 'diaforcedsource_snapshot',
+                'host_galaxy', 'root_diaobject', 'diaobject', 'diasource', 'diaforcedsource',
+                'diaobject_root_map', 'diaobject_snapshot', 'diasource_snapshot', 'diaforcedsource_snapshot',
                 'query_queue' ]
 
+import sys
 import psycopg2
 import config
 
@@ -17,6 +18,7 @@ conn = psycopg2.connect( host=config.dbhost, port=config.dbport, dbname=config.d
 try:
     cursor = conn.cursor()
     for table in data_tables:
+        sys.stderr.write( f"Truncating table {table}...\n" )
         cursor.execute( f"TRUNCATE TABLE {table} CASCADE" )
     conn.commit()
 finally:

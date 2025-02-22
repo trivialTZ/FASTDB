@@ -25,9 +25,10 @@ class FastDBLoader:
     """
 
     def __init__( self ):
-        self._all_tables = [ 'host_galaxy', 'diaobject', 'diasource', 'diaforcedsource',
-                             'processing_version', 'snapshot', 'diasource_snapshot',
-                             'diaforcedsource_snapshot' ]
+        self._all_tables = [ 'host_galaxy', 'root_diaobject', 'diaobject', 'diaobject_root_map',
+                             'diasource', 'diaforcedsource',
+                             'processing_version', 'snapshot',
+                             'diaobject_snapshot', 'diasource_snapshot', 'diaforcedsource_snapshot' ]
 
     def disable_indexes_and_fks( self ):
         """This is scary.  It disables all indexes and foreign keys on the tables to be loaded.

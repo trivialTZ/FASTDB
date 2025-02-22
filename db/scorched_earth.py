@@ -2,10 +2,11 @@
 
 all_tables = [ 'authuser', 'passwordlink',
                'processing_version', 'snapshot',
-               'host_galaxy', 'diaobject', 'diasource', 'diaforcedsource',
-               'diasource_snapshot', 'diaforcedsource_snapshot',
+               'host_galaxy', 'root_diaobject', 'diaobject', 'diasource', 'diaforcedsource',
+               'diaobject_root_map', 'diaobject_snapshot', 'diasource_snapshot', 'diaforcedsource_snapshot',
                'query_queue', 'migrations_applied' ]
 
+import sys
 import psycopg2
 import config
 
@@ -17,6 +18,7 @@ conn = psycopg2.connect( host=config.dbhost, port=config.dbport, dbname=config.d
 try:
     cursor = conn.cursor()
     for table in all_tables:
+        sys.stderr.write( f"Droppint table {table}...\n" )
         cursor.execute( f"DROP TABLE IF EXISTS {table} CASCADE" )
     conn.commit()
 finally:

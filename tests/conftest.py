@@ -1,5 +1,4 @@
 import pytest
-import uuid
 import datetime
 
 from db import ProcessingVersion, DiaObject, DiaSource, DiaForcedSource, Snapshot, DB, AuthUser
@@ -74,9 +73,8 @@ def snapshot2():
 
 @pytest.fixture
 def obj1( procver1 ):
-    obj = DiaObject( id=uuid.uuid4(),
+    obj = DiaObject( diaobjectid=42,
                      processing_version=procver1.id,
-                     diaobjectid=42,
                      radecmjdtai=60000.,
                      ra=42.,
                      dec=13
@@ -86,8 +84,8 @@ def obj1( procver1 ):
     yield obj
     with DB() as con:
         cursor = con.cursor()
-        cursor.execute( "DELETE FROM diaobject WHERE id=%(id)s",
-                        { 'id': str(obj.id) } )
+        cursor.execute( "DELETE FROM diaobject WHERE diaobjectid=%(id)s AND processing_Version=%(pv)s",
+                        { 'id': obj.diaobjectid, 'pv': procver1.id } )
         con.commit()
 
 
@@ -95,7 +93,8 @@ def obj1( procver1 ):
 def src1( obj1, procver1 ):
     src = DiaSource( diasourceid=42,
                      processing_version=procver1.id,
-                     diaobjectuuid=obj1.id,
+                     diaobjectid=obj1.diaobjectid,
+                     diaobject_procver=obj1.processing_version,
                      visit=64,
                      detector=9,
                      band='r',
@@ -119,7 +118,8 @@ def src1( obj1, procver1 ):
 def src1_pv2( obj1, procver2 ):
     src = DiaSource( diasourceid=42,
                      processing_version=procver2.id,
-                     diaobjectuuid=obj1.id,
+                     diaobjectid=obj1.diaobjectid,
+                     diaobject_procver=obj1.processing_version,
                      visit=64,
                      detector=9,
                      band='r',
@@ -143,7 +143,8 @@ def src1_pv2( obj1, procver2 ):
 def forced1( obj1, procver1 ):
     src = DiaForcedSource( diaforcedsourceid=42,
                            processing_version=procver1.id,
-                           diaobjectuuid=obj1.id,
+                           diaobjectid=obj1.diaobjectid,
+                           diaobject_procver=obj1.processing_version,
                            visit=128.,
                            detector=10.,
                            midpointmjdtai=59100.,
@@ -171,7 +172,8 @@ def forced1( obj1, procver1 ):
 def forced1_pv2( obj1, procver2 ):
     src = DiaForcedSource( diaforcedsourceid=42,
                            processing_version=procver2.id,
-                           diaobjectuuid=obj1.id,
+                           diaobjectid=obj1.diaobjectid,
+                           diaobject_procver=obj1.processing_version,
                            visit=128.,
                            detector=10.,
                            midpointmjdtai=59100.,
