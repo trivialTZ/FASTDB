@@ -22,7 +22,6 @@ def test_load_snana_fits():
         com.extend( dirs )
         com.append( "--do" )
 
-        import pdb; pdb.set_trace()
         res = subprocess.run( com, capture_output=True )
 
         assert res.returncode == 0
