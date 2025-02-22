@@ -3,7 +3,7 @@
 
 services:
   postgres:
-    image: ${DOCKER_ARCHIVE:-registry.nersc.gov/m1727/raknop}/fastdb-postres:${DOCKER_VERSION:-latest}
+    image: ${DOCKER_ARCHIVE:-registry.nersc.gov/m1727/raknop}/fastdb-postgres:${DOCKER_VERSION:-latest}
     build:
       context: ./docker/postgres
       target: postgres
