@@ -1,6 +1,5 @@
 # Ignore these directories
 exclude = [
-    "old/**",
     "temp/**",
     "extern/**",
     ".git",
