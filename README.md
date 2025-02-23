@@ -18,6 +18,7 @@ In that directory there should be subdirectories `install`, `query_results`, and
 git clone git@github.com:LSSTDESC/FASTDB
 cd FASTDB
 git checkout <version>
+git submodule update --init
 ```
 
 (With `git pull` updates and such as usual.)

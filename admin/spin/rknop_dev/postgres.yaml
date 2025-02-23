@@ -83,7 +83,7 @@ spec:
           claimName: fastdb-rknop-dev-postgres-pvc-20250222
       - name: secrets
         secret:
-          defaultMode: 256
+          defaultMode: 292
           optional: false
           secretName: secrets
       - emptyDir:

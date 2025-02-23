@@ -61,7 +61,7 @@ spec:
           volumes:
           - name: secrets
             secret:
-              defaultMode: 256
+              defaultMode: 292
               optional: false
               secretName: secrets
           - hostPath:
