@@ -2,14 +2,13 @@
 **/__pycache__/**
 
 # Autoconf debris
-# /Makefile
-# /aclocal.m4
-# /autom4te.cache
-# /config.log
-# /config.status
-# /src/Makefile
-# /src/config.py
-# /src/webserver/Makefile
+/Makefile
+/autom4te.cache
+/config.log
+/config.status
+/src/Makefile
+/src/config.py
+/src/webserver/Makefile
 
 # Test install location
 install/
