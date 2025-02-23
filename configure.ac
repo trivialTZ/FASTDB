@@ -1,5 +1,5 @@
 AC_INIT([fastdb], [0.1], [raknop@lbl.gov])
-AM_INIT_AUTOMAKE([1.15 foreign])
+AM_INIT_AUTOMAKE([foreign])
 AC_CONFIG_FILES([
   Makefile
   src/Makefile
