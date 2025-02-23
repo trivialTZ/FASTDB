@@ -8,7 +8,7 @@ AC_CONFIG_FILES([
 ])
 
 AC_ARG_WITH( installdir,
-             [AS_HELP_STRING([--with-webapdir=DIR], [Directory to install to [install]])],
+             [AS_HELP_STRING([--with-installdir=DIR], [Directory to install to [/usr/local/fastdb]])],
              [installdir=$withval],
              [installdir=/usr/local/fastdb] )
 
