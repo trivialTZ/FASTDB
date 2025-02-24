@@ -3,7 +3,6 @@
 if [ ! -f $POSTGRES_DATA_DIR/PG_VERSION ]; then
     echo "Running initdb in $POSTGRES_DATA_DIR"
     /usr/lib/postgresql/15/bin/initdb -U postgres --pwfile=/secrets/pgpasswd $POSTGRES_DATA_DIR
-    rm $HOME/pwfile
     /usr/lib/postgresql/15/bin/pg_ctl -D $POSTGRES_DATA_DIR start
     psql --command "CREATE DATABASE fastdb OWNER postgres"
     psql --command "CREATE EXTENSION q3c" fastdb
