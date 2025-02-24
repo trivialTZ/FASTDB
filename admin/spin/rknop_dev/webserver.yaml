@@ -147,17 +147,17 @@ spec:
             port:
               number: 8080
         pathType: ImplementationSpecific
-  # - host: fastdb-rknop-dev.lbl.gov
-  #   http:
-  #     paths:
-  #     - backend:
-  #         service:
-  #           name: webserver-ingress
-  #           port:
-  #             number: 8080
-  #       pathType: ImplementationSpecific
-  # tls:
-  # - hosts:
-  #   - fastdb-rknop-dev.lbl.gov
-  #   secretName: fastdb-cert
+  - host: fastdb-rknop-dev.lbl.gov
+    http:
+      paths:
+      - backend:
+          service:
+            name: webserver-ingress
+            port:
+              number: 8080
+        pathType: ImplementationSpecific
+  tls:
+  - hosts:
+    - fastdb-rknop-dev.lbl.gov
+    secretName: fastdb-cert
 ---
