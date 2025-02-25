@@ -168,7 +168,7 @@ class FASTDBClient:
     def retry_send( self, url, data=None, json=None, method="post" ):
         """Send a python requests POST or GET to a web server with retries.
 
-        You usually want to use .post(), .send(), or one of the more
+        You usually want to use .post(), or one of the more
         specific methods rather than calling this directly.
 
         Parameters
@@ -283,23 +283,35 @@ class FASTDBClient:
                 raise RuntimeError( f"Unexpected response logging in: {res.text}" )
 
 
-    def post( self, relative_url, data=None, json=None, verifyloggedin=True ):
-        """Send a POST query to the server.
+    # ======================================================================
+    # The generic method for communcating with a fastdb API endpoint
 
-        If you're expecting a json-encoded response, you may want to use
-        send()
+    def post( self, relative_url, json=None, data=None, verifyloggedin=True, return_format='json' ):
+        """Send a POST query to the server.
 
         Parameters
         ----------
           relative_url: str
             URL relative to the base webap URL.
 
-          data: (something), default None
-            Passed to requests post via data=
+          json: dict, default None
+            Parameters to pass to the API endpoint.  This will usually
+            be in the form of a dictionary.  Which keywords are
+            expected, and what the values can be, will differ from API
+            endpoint to endpoint.  (Some endpoints won't expect
+            anything, in which case you can just not specify this
+            argument.)  See the FASTDB API documentation for what you should
+            send.  (For the technical-minded, this is passed on to a
+            python requests session object's post method via the
+            parameter 'json').
 
-          json: object, default None
-            An object (usually a dictionary) to encode as json and send to the server
-            as the body of the request.  Passed via requests' json= parameter.
+          data: (something), default None
+            Raw data to upload to the API endpoint.  Most endpoints will
+            not use this, but will use the json parameter instead.  If
+            there is ever an endpoint that does something like file
+            upload, that's where you'd use json.  (For the
+            technical-minded, this is passed on to a python requests
+            session object's post method via the parmeter 'data'.)
 
           verifyloggedin : bool, default True
             If True, verify that we're logged into the server, and if
@@ -308,10 +320,35 @@ class FASTDBClient:
             initial connection to the server, which has some overhead.
             If you don't want this, set verifyloggedin to False to have
             it assume you're logged in, and just fail if you're not.
+            (If you're doing a lot of rapid posts to the server, you may
+            well want to set this to False for performance reasons.  If
+            you're doing only a post every few seconds or less often,
+            the overhead will probably not be too significant.)
+
+          return_format : str, default 'json'
+            What do you want returned from the call to this function?
+            Can be one of 'json', 'csv', or 'raw'.  'raw' should always
+            work; other options will only work if the api endpoint
+            you're hitting is compatible.
+
 
         Returns
         -------
-          A requests Response object
+          Something
+
+          What you get back depends on what you passed to "return_format":
+
+              raw : a python requests.Response object.  Do whatever you want with it.
+
+              json : a dictionary or a list.  If you ask for return_format
+                     'json', you are telling the function that it should
+                     expect the server to return json which can be
+                     parsed to a python datastructure.
+
+              csv : You will get the text of a csv file, assuming that
+                    the api endpoint returns csv.  Note that you do not
+                    get the filename; you get the actual text.  Write it
+                    to a file if you want a file.  [NOT CURRENTLY IMPLEMENTED]
 
         """
 
@@ -320,38 +357,22 @@ class FASTDBClient:
 
         slash = '/' if ( ( self.url[-1] != '/' ) and ( relative_url[0] != '/' ) ) else ''
         res = self.retry_send( f'{self.url}{slash}{relative_url}', json=json )
-        return res
 
+        if return_format == 'raw':
+            return res
 
-    def send( self, relative_url, json=None ):
-        """Send a POST query to the server, parse the json response to a python object.
+        if return_format == 'json':
+            if res.headers.get('Content-Type')[:16] != 'application/json':
+                raise RuntimeError( f"Expected json back from fastdb server, but got "
+                                    f"{res.headers.get('Content_Type')}" )
+            return res.json()
 
-        Raises an exception if the server doesn't send back application/json
-
-        Parameters
-        ----------
-          relative_url: str
-            URL relative to the base webap URL passed to the rkAuthClient constructor.
-
-          json: object, default None
-            An object (usually a dictionary) to encode as json and send to the server
-            as the body of the request.  Passed via requests' json= parameter.
-
-        Returns
-        -------
-          Whatever python object was parsed from the JSON returned by the server.
-
-        """
-
-        res = self.post( relative_url, json=json )
-        if res.headers.get('Content-Type')[:16] != 'application/json':
-            raise RuntimeError( f"Expected json back from conductor but got "
-                                f"{res.headers.get('Content_Type')}" )
-        return res.json()
+        if return_format == 'csv':
+            raise NotImplementedError( "CSV return format not yet implemented." )
 
 
     # ======================================================================
-    # Methdos for communicating with the db/ api for direct sql queries
+    # Methods for communicating with the db/ api for direct sql queries
 
     def _parse_query( self, query, subdict, return_format=0 ):
         if subdict is not None:
@@ -422,7 +443,7 @@ class FASTDBClient:
         """
 
         json = self._parse_query( query, subdict, return_format )
-        data = self.send( self.short_query_url, json=json )
+        data = self.post( self.short_query_url, json=json )
 
         if 'status' not in data.keys():
             raise ValueError( "Unexpected response, no 'status' in return value" )
@@ -431,7 +452,7 @@ class FASTDBClient:
         elif data['status'] != 'ok':
             raise RuntimeError( f"status is {data['status']} and I don't know how to cope" )
         else:
-            return data['rows']
+            return data['rows'] if return_format == 0  else data['data']
 
 
     def submit_long_sql_query( self, query, subdict=None, return_format='csv' ):
@@ -459,7 +480,7 @@ class FASTDBClient:
         """
 
         json = self._parse_query( query, subdict, return_format )
-        data = self.send( self.submit_long_query_url, json=json )
+        data = self.post( self.submit_long_query_url, json=json )
 
         if 'status' not in data.keys():
             raise ValueError( "Unexpected response, no 'status' in return value" )
@@ -501,7 +522,7 @@ class FASTDBClient:
 
         """
 
-        result = self.send( f"{self.check_long_sql_query_url}{queryid}/" )
+        result = self.post( f"{self.check_long_sql_query_url}{queryid}/" )
         if 'status' not in result.keys():
             raise ValueError( "Unexpected response, no 'status' in return value" )
         return result
