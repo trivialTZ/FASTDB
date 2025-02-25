@@ -4,8 +4,8 @@ Development of the Fast Access to Survey Transients Database (FASTDB).
 * [Overview](#overview)
 * [Using the FASTDB client](#using-the-fastdb-client)
 * [Rob Notes](#rob-notes)
-** [Installing fastdb_rknop_dev)(#installing-fastdb_rknop_dev)
-** [Building for tests](#building for tests)
+  * [Installing fastdb_rknop_dev)(#installing-fastdb_rknop_dev)
+  * [Building for tests](#building for tests)
 
 ## Overview
 
