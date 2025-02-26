@@ -551,7 +551,7 @@ class FASTDBClient:
 
         """
 
-        result = self.post( f"{self.get_long_sql_query_results_url}{queryid}/" )
+        result = self.post( f"{self.get_long_sql_query_results_url}{queryid}/", return_format='raw' )
         ctype = result.headers[ 'content-type' ]
         if ctype == 'text/csv; charset=utf-8':
             return result.text
@@ -562,7 +562,7 @@ class FASTDBClient:
                              f"or 'application/octet-stream'" )
 
 
-    def synchronous_long_sql_query( self, query, subdict=None, return_format='csv', checkeach=30, maxwait=3600 ):
+    def synchronous_long_sql_query( self, query, subdict=None, return_format='csv', checkeach=300, maxwait=3600 ):
         """Get the result of an SQL query to FASDB.
 
         If the query will take less than 5 minutes, use submit_short_sql_query() instead.
@@ -606,7 +606,7 @@ class FASTDBClient:
                 strio.write( "Long query failed" )
                 if 'finished' in data:
                     strio.write( f" at {data['finished']}" )
-                strio.write( f"with error {data['error']}" )
+                strio.write( f" with error: {data['error']}" )
                 raise RuntimeError( strio.getvalue() )
 
             elif data['status'] == 'finished':

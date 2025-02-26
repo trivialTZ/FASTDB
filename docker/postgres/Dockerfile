@@ -34,7 +34,7 @@ RUN echo "host all all 0.0.0.0/0 md5" >> /etc/postgresql/15/main/pg_hba.conf
 COPY postgresql.conf /etc/postgresql/15/main/postgresql.conf
 ENV POSTGRES_DATA_DIR=/var/lib/postgresql/data
 
-ENV LESS=-XLRimake
+ENV LESS=-XLRi
 
 # ======================================================================
 FROM base AS build
