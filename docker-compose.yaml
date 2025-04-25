@@ -2,6 +2,31 @@
 # environment
 
 services:
+  kafka-zookeeper:
+    image: ${DOCKER_ARCHIVE:-registry.nersc.gov/m1727/raknop}/fastdb-kafka-test:${DOCKER_VERSION:-latest}
+    build:
+      context: ./docker/kafka
+    healthcheck:
+      test: netcat -w 1 localhost 2181 || exit 1
+      interval: 5s
+      timeout: 10s
+      retries: 5
+    entrypoint: [ "bin/zookeeper-server-start.sh", "config/zookeeper.properties" ]
+
+  kafka-server:
+    depends_on:
+       kafka-zookeeper:
+         condition: service_healthy
+    image: ${DOCKER_ARCHIVE:-registry.nersc.gov/m1727/raknop}/fastdb-kafka-test:${DOCKER_VERSION:-latest}
+    build:
+      context: ./docker/kafka
+    healthcheck:
+      test: netcat -w 1 localhost 9092 || exit 1
+      interval: 5s
+      timeout: 10s
+      retries: 5
+    entrypoint: [ "bin/kafka-server-start.sh", "config/server.properties" ]
+
   postgres:
     image: ${DOCKER_ARCHIVE:-registry.nersc.gov/m1727/raknop}/fastdb-postgres:${DOCKER_VERSION:-latest}
     build:
@@ -17,6 +42,30 @@ services:
         read_only: true
     healthcheck:
       test: netcat -w 1 localhost 5432 || exit 1
+      interval: 5s
+      timeout: 10s
+      retries: 5
+
+  mongodb:
+    image: ${DOCKER_ARCHIVE:-registry.nersc.gov/m1727/raknop}/fastdb-mongodb:${DOCKER_VERSION:-latest}
+    build:
+      context: ./docker/mongodb
+    environment:
+      - MONGODB_HOST=mongodb
+      - MONGODB_DBNAME=brokeralert
+      - MONGODB_COLLECTION=alerts
+      - MONGODB_ADMIN_USER=admin
+      - MONGODB_ADMIN_PASSWD=fragile
+      - MONGODB_ALERT_READER_USER=alertreader
+      - MONGODB_ALERT_READER_PASSWD=reader
+      - MONGODB_ALERT_WRITER_USER=alertwriter
+      - MONGODB_ALERT_WRITER_PASSWD=writer
+    volumes:
+      - type: volume
+        source: mongodb_data
+        target: /data/db
+    healthcheck:
+      test: test `mongosh mongodb://$$MONGODB_ADMIN_USER:$$MONGODB_ADMIN_PASSWD@localhost/admin --eval "use admin" --eval "db.system.users.find({user:'$$MONGODB_ADMIN_USER'}).count()"` -eq 1 || exit 1
       interval: 5s
       timeout: 10s
       retries: 5
@@ -69,6 +118,8 @@ services:
 
   webap:
     depends_on:
+      mongodb:
+        condition: service_healthy
       createdb:
         condition: service_completed_successfully
       mailhog:
@@ -79,6 +130,16 @@ services:
     build:
       context: ./docker/webserver
       target: webserver
+    environment:
+      - MONGODB_HOST=mongodb
+      - MONGODB_DBNAME=brokeralert
+      - MONGODB_COLLECTION=alerts
+      - MONGODB_ADMIN_USER=admin
+      - MONGODB_ADMIN_PASSWD=fragile
+      - MONGODB_ALERT_READER_USER=alertreader
+      - MONGODB_ALERT_READER_PASSWD=reader
+      - MONGODB_ALERT_WRITER_USER=alertwriter
+      - MONGODB_ALERT_WRITER_PASSWD=writer
     user: ${USERID:-0}:${GROUPID:-0}
     ports:
       - "${WEBPORT:-8080}:8080"
@@ -99,24 +160,42 @@ services:
       - type: volume
         source: query_results
         target: /query_results
+      - type: volume
+        source: logs
+        target: /logs
     post_start:
       - command: /bin/bash -c "
                    chown -R ${USERID:-0}:${GROUPID:-0} /sessions
                    && chown -R ${USERID:-0}:${GROUPID:-0} /query_results
+                   && chown -R ${USERID:-0}:${GROUPID:-0} /logs
                    "
         privileged: true
         user: root
 
   shell:
     depends_on:
+      kafka-server:
+        condition: service_healthy
       postgres:
         condition: service_healthy
-      # createdb:
-      #   condition: service_completed_successfully
+      mongodb:
+        condition: service_healthy
+      createdb:
+        condition: service_completed_successfully
     image: ${DOCKER_ARCHIVE:-registry.nersc.gov/m1727/raknop}/fastdb-shell:${DOCKER_VERSION:-latest}
     build:
       context: ./docker/webserver
       target: shell
+    environment:
+      - MONGODB_HOST=mongodb
+      - MONGODB_DBNAME=brokeralert
+      - MONGODB_COLLECTION=alerts
+      - MONGODB_ADMIN_USER=admin
+      - MONGODB_ADMIN_PASSWD=fragile
+      - MONGODB_ALERT_READER_USER=alertreader
+      - MONGODB_ALERT_READER_PASSWD=reader
+      - MONGODB_ALERT_WRITER_USER=alertwriter
+      - MONGODB_ALERT_WRITER_PASSWD=writer
     user: ${USERID:-0}:${GROUPID:-0}
     volumes:
       - type: bind
@@ -135,10 +214,65 @@ services:
       - type: volume
         source: query_results
         target: /query_results
+      - type: volume
+        source: logs
+        target: /logs
     post_start:
       - command: /bin/bash -c "
                    chown -R ${USERID:-0}:${GROUPID:-0} /sessions
                    && chown -R ${USERID:-0}:${GROUPID:-0} /query_results
+                   && chown -R ${USERID:-0}:${GROUPID:-0} /logs
+                   "
+        privileged: true
+        user: root
+    working_dir: /code
+
+  shell-nocreatedb:
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    image: ${DOCKER_ARCHIVE:-registry.nersc.gov/m1727/raknop}/fastdb-shell:${DOCKER_VERSION:-latest}
+    build:
+      context: ./docker/webserver
+      target: shell
+    environment:
+      - MONGODB_HOST=mongodb
+      - MONGODB_DBNAME=brokeralert
+      - MONGODB_COLLECTION=alerts
+      - MONGODB_ADMIN_USER=admin
+      - MONGODB_ADMIN_PASSWD=fragile
+      - MONGODB_ALERT_READER_USER=alertreader
+      - MONGODB_ALERT_READER_PASSWD=reader
+      - MONGODB_ALERT_WRITER_USER=alertwriter
+      - MONGODB_ALERT_WRITER_PASSWD=writer
+    user: ${USERID:-0}:${GROUPID:-0}
+    volumes:
+      - type: bind
+        source: tests/secrets
+        target: /secrets
+        read_only: true
+      - type: bind
+        source: .
+        target: /code
+      - type: bind
+        source: install
+        target: /fastdb
+      - type: volume
+        source: sessions
+        target: /sessions
+      - type: volume
+        source: query_results
+        target: /query_results
+      - type: volume
+        source: logs
+        target: /logs
+    post_start:
+      - command: /bin/bash -c "
+                   chown -R ${USERID:-0}:${GROUPID:-0} /sessions
+                   && chown -R ${USERID:-0}:${GROUPID:-0} /query_results
+                   && chown -R ${USERID:-0}:${GROUPID:-0} /logs
                    "
         privileged: true
         user: root
@@ -146,5 +280,7 @@ services:
 
 volumes:
   postgres_data:
+  mongodb_data:
   query_results:
   sessions:
+  logs:

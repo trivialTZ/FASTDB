@@ -1,8 +1,38 @@
+import sys
+import os
 import pytest
+import pathlib
 import datetime
+import subprocess
+
+from pymongo import MongoClient
 
 from db import ProcessingVersion, DiaObject, DiaSource, DiaForcedSource, Snapshot, DB, AuthUser
 from util import asUUID
+
+sys.path.insert( 0, pathlib.Path(__file__).parent )
+# For cleanliness, a bunch of fixtures are broken
+#   out into their own files.  To be able to see
+#   them, put those files in this list below.
+#   (pytest is kind of a beast).  Those files
+#   should all live in the fixtures subdirectory.
+pytest_plugins = [ 'fixtures.alertcycle' ]
+
+
+@pytest.fixture( scope='session' )
+def procver():
+    pv = ProcessingVersion( id=1, description='test_procesing_version',
+                            validity_start=datetime.datetime( 2025, 2, 14, 0, 0, 0 ),
+                            validity_end=datetime.datetime( 2999, 2, 14, 0, 0, 0 )
+                           )
+    pv.insert()
+
+    yield pv
+    with DB() as con:
+        cursor = con.cursor()
+        cursor.execute( "DELETE FROM processing_version WHERE id=%(id)s",
+                        { 'id': pv.id } )
+        con.commit()
 
 
 @pytest.fixture
@@ -228,3 +258,54 @@ tyOci9saPPfI1bNnKD202zsCAwEAAQ==
     yield user
 
     user.delete_from_db()
+
+
+@pytest.fixture( scope='session' )
+def snana_fits_ppdb_loaded():
+    e2td = pathlib.Path( "elasticc2_test_data" )
+    assert e2td.is_dir()
+    dirs = e2td.glob( "*" )
+    dirs = [ d for d in dirs if d.is_dir() ]
+    assert len(dirs) > 0
+
+    try:
+        com = [ "python", "/code/src/admin/load_snana_fits.py",
+                "-n", "5",
+                "-v",
+                "--ppdb",
+                "-d",
+               ]
+        com.extend( dirs )
+        com.append( "--do" )
+
+        res = subprocess.run( com, capture_output=True )
+        assert res.returncode == 0
+
+        yield True
+
+    finally:
+        with DB() as conn:
+            cursor = conn.cursor()
+            for tab in [ 'ppdb_host_galaxy', 'ppdb_diaobject', 'ppdb_diasource', 'ppdb_diaforcedsource' ]:
+                cursor.execute( f"TRUNCATE TABLE {tab} CASCADE" )
+            conn.commit()
+
+
+@pytest.fixture
+def mongoclient():
+    host = os.getenv( 'MONGODB_HOST' )
+    dbname = os.getenv( 'MONGODB_DBNAME' )
+    user = os.getenv( "MONGODB_ALERT_READER_USER" )
+    password = os.getenv( "MONGODB_ALERT_READER_PASSWD" )
+    client = MongoClient( f"mongodb://{user}:{password}@{host}:27017/{dbname}?authSource={dbname}" )
+    return client
+
+
+@pytest.fixture
+def mongoclient_rw():
+    host = os.getenv( 'MONGODB_HOST' )
+    dbname = os.getenv( 'MONGODB_DBNAME' )
+    user = os.getenv( "MONGODB_ALERT_WRITER_USER" )
+    password = os.getenv( "MONGODB_ALERT_WRITER_PASSWD" )
+    client = MongoClient( f"mongodb://{user}:{password}@{host}:27017/{dbname}?authSource={dbname}" )
+    return client

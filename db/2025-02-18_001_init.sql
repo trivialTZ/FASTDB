@@ -29,7 +29,7 @@ CREATE TABLE processing_version(
   validity_start timestamp with time zone NOT NULL,
   validity_end timestamp with time zone
 );
-CREATE UNIQUE INDEX idx_processingversion_desc ON processing_version(description);  
+CREATE UNIQUE INDEX idx_processingversion_desc ON processing_version(description);
 
 -- SnapShot
 -- Can define a set of objects by tagging the processing version and thing id
@@ -136,7 +136,7 @@ CREATE TABLE diaobject(
   pmdec real,
   pmdecerr real,
   pmdec_parallax_cov real,
-  pm_ra_dec_cov real,
+  pmra_pmdec_cov real,
 
   PRIMARY KEY (diaobjectid, processing_version)
 );
@@ -145,10 +145,13 @@ CREATE INDEX idx_diaobject_diaobjectid ON diaobject(diaobjectid);
 CREATE INDEX idx_diaobject_procver ON diaobject(processing_version);
 ALTER TABLE diaobject ADD CONSTRAINT fk_diaobject_procver
   FOREIGN KEY (processing_version) REFERENCES processing_version(id) ON DELETE RESTRICT;
+CREATE INDEX idx_diaobject_nearbyext1 ON diaobject(nearbyextobj1id);
 ALTER TABLE diaobject ADD CONSTRAINT fk_diaobject_nearbyext1
   FOREIGN KEY (nearbyextobj1id) REFERENCES host_galaxy(id) ON DELETE SET NULL;
+CREATE INDEX idx_diaobject_nearbyext2 ON diaobject(nearbyextobj2id);
 ALTER TABLE diaobject ADD CONSTRAINT fk_diaobject_nearbyext2
   FOREIGN KEY (nearbyextobj2id) REFERENCES host_galaxy(id) ON DELETE SET NULL;
+CREATE INDEX idx_diaobject_nearbyext3 ON diaobject(nearbyextobj3id);
 ALTER TABLE diaobject ADD CONSTRAINT fk_diaobject_nearbyext3
   FOREIGN KEY (nearbyextobj3id) REFERENCES host_galaxy(id) ON DELETE SET NULL;
 
@@ -242,14 +245,14 @@ CREATE TABLE diasource(
 
   scienceflux real,
   sciencefluxerr real,
-  
+
   fpbkgd real,
   fpbkgderr real,
 
   parentdiasourceid bigint,
   extendedness real,
   reliability real,
-  
+
   ixx real,
   ixxerr real,
   iyy real,
@@ -262,7 +265,7 @@ CREATE TABLE diasource(
   ixxpsf real,
   iyypsf real,
   ixypsf real,
-  
+
   flags integer,
   pixelflags integer,
 
@@ -277,15 +280,19 @@ CREATE INDEX idx_diasource_band ON diasource(band);
 CREATE INDEX idx_diasource_mjd ON diasource(midpointmjdtai);
 CREATE INDEX idx_diasource_diaobjectidpv ON diasource(diaobjectid,diaobject_procver);
 ALTER TABLE diasource ADD CONSTRAINT fk_diasource_diaobject
-  FOREIGN KEY (diaobjectid,diaobject_procver) REFERENCES diaobject(diaobjectid,processing_version) ON DELETE CASCADE;
+  FOREIGN KEY (diaobjectid,diaobject_procver) REFERENCES diaobject(diaobjectid,processing_version) ON DELETE CASCADE
+  DEFERRABLE INITIALLY IMMEDIATE;
 CREATE INDEX idx_diasource_procver ON diasource(processing_version);
 ALTER TABLE diasource ADD CONSTRAINT fk_diasource_procver
   FOREIGN KEY (processing_version) REFERENCES processing_version(id) ON DELETE RESTRICT;
-  
+
 CREATE TABLE diasource_default PARTITION OF diasource DEFAULT;
 
 
 -- Selected from DiaForcedSource APDB table
+-- NOTE : I would love to make the scienceflux and sciencefluxerr
+--   fields non-nullable, but for our tests we don't have this
+--   information from the SNANA files, so we need them to be nullable.
 CREATE TABLE diaforcedsource (
   diaforcedsourceid bigint NOT NULL,
   processing_version integer NOT NULL,
@@ -299,8 +306,8 @@ CREATE TABLE diaforcedsource (
   dec double precision NOT NULL,
   psfflux real NOT NULL,
   psffluxerr real NOT NULL,
-  scienceflux real NOT NULL,
-  sciencefluxerr real NOT NULL,
+  scienceflux real,
+  sciencefluxerr real,
   time_processed timestamp with time zone,
   time_withdrawn timestamp with time zone,
 
@@ -315,7 +322,8 @@ CREATE INDEX idx_diaforcedsource_mjdtai ON diaforcedsource(midpointmjdtai);
 CREATE INDEX idx_diaforcedsource_band ON diaforcedsource(band);
 CREATE INDEX idx_diaforcedsource_diaobjectidpv ON diaforcedsource(diaobjectid,diaobject_procver);
 ALTER TABLE diaforcedsource ADD CONSTRAINT fk_diaforcedsource_diaobject
-  FOREIGN KEY (diaobjectid,diaobject_procver) REFERENCES diaobject(diaobjectid,processing_version) ON DELETE CASCADE;
+  FOREIGN KEY (diaobjectid,diaobject_procver) REFERENCES diaobject(diaobjectid,processing_version) ON DELETE CASCADE
+  DEFERRABLE INITIALLY IMMEDIATE;
 CREATE INDEX idx_diaforcedsource_procver ON diaforcedsource(processing_version);
 ALTER TABLE diaforcedsource ADD CONSTRAINT fk_diaforcedsource_procver
   FOREIGN KEY (processing_version) REFERENCES processing_version(id) ON DELETE RESTRICT;
@@ -389,10 +397,3 @@ CREATE TABLE query_queue(
 CREATE INDEX ix_query_queue_userid ON query_queue(userid);
 ALTER TABLE query_queue ADD CONSTRAINT fk_query_queue_userid
   FOREIGN KEY (userid) REFERENCES authuser(id) ON DELETE CASCADE;
-
-
-CREATE TABLE migrations_applied(
-  filename text,
-  applied_time timestamp with time zone DEFAULT NOW()
-);
-INSERT INTO migrations_applied(filename) VALUES('2025-02-18_001_init.sql');
