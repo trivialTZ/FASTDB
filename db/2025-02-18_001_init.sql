@@ -42,35 +42,33 @@ CREATE UNIQUE INDEX idx_snapshot_desc ON snapshot(description);
 
 
 -- This table is based on the Object table in section 4.3.1 of the DPDD
--- (revision 2023-07-10).
+--   (revision 2023-07-10).  It's really not obvious to me which colums
+--   we want to include, so I've picked some for now.
 -- NOTE : the quantiles predicted in that document are 1, 5, 25, 50, 75, and 99.
 --   Here, we have the ones that are in SNANA ELASTICC
--- NOTE 2 : psra ad psdec are not the right things to use.
---   but, use them for now.
 CREATE TABLE host_galaxy(
   id UUID PRIMARY KEY NOT NULL DEFAULT gen_random_uuid(),
   processing_version integer NOT NULL,
   objectid bigint NOT NULL,
-  psradectai real,
-  psra double precision,
-  psdec double precision,
-  stdcolor_u real,
-  stdcolor_g real,
-  stdcolor_r real,
-  stdcolor_i real,
-  stdcolor_z real,
-  stdcolor_y real,
-  stdcolor_u_err real,
-  stdcolor_g_err real,
-  stdcolor_r_err real,
-  stdcolor_i_err real,
-  stdcolor_z_err real,
-  stdcolor_y_err real,
+  ra double precision,
+  dec double precision,
+  petroflux_r real,
+  petroflux_r_err real,
+  stdcolor_u_g real,
+  stdcolor_g_r real,
+  stdcolor_r_i real,
+  stdcolor_i_z real,
+  stdcolor_z_y real,
+  stdcolor_u_g_err real,
+  stdcolor_g_r_err real,
+  stdcolor_r_i_err real,
+  stdcolor_i_z_err real,
+  stdcolor_z_y_err real,
   pzmode real,
   pzmean real,
   pzstd real,
   pzskew real,
-  pskurt real,
+  pzkurt real,
   pzquant000 real,
   pzquant010 real,
   pzquant020 real,
@@ -85,7 +83,7 @@ CREATE TABLE host_galaxy(
   flags bigint
 );
 CREATE INDEX idx_hostgalaxy_objectid ON host_galaxy(objectid);
-CREATE INDEX idx_hostgalaxy_q3c ON host_galaxy(q3c_ang2ipix(psra, psdec));
+CREATE INDEX idx_hostgalaxy_q3c ON host_galaxy(q3c_ang2ipix(ra, dec));
 
 
 CREATE TABLE root_diaobject(

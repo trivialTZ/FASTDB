@@ -51,16 +51,15 @@ class ColumnMapper:
         n = "" if n == 1 else str(n)
 
         mapper = { f'HOSTGAL{n}_OBJID': 'objectid',
-                   'MJD_TRIGGER': 'psradectai',
-                   f'HOSTGAL{n}_RA': 'psra',
-                   f'HOSTGAL{n}_DEC': 'psdec',
+                   f'HOSTGAL{n}_RA': 'ra',
+                   f'HOSTGAL{n}_DEC': 'dec',
                    f'HOSTGAL{n}_PHOTOZ': 'pzmean',
                    f'HOSTGAL{n}_PHOTOZ_ERR': 'pzstd',
                   }
         lcs = {}
         for band in [ 'u', 'g', 'r', 'i', 'z', 'Y' ]:
-            mapper[ f'HOSTGAL{n}_MAG_{band}' ] = f'stdcolor_{band.lower()}'
-            mapper[ f'HOSTGAL{n}_MAGERR_{band}' ] = f'stdcolor_{band.lower()}_err'
+            mapper[ f'HOSTGAL{n}_MAG_{band}' ] = f'mag_{band.lower()}'
+            mapper[ f'HOSTGAL{n}_MAGERR_{band}' ] = f'mag_{band.lower()}_err'
         for quant in range(0, 110, 10):
             mapper[ f'HOSTGAL{n}_ZPHOT_Q{quant:03d}' ] = f'pzquant{quant:03d}'
 
@@ -171,8 +170,35 @@ class FITSFileHandler( ColumnMapper ):
             hostgal = hostgal[ hostgal[ 'objectid' ] > 0 ]
             hostgal = astropy.table.unique( hostgal, keys='objectid' )
             hostgal.add_column( [ str(uuid.uuid4()) for i in range(len(hostgal)) ], name='id' )
+
+            # Calculate some derived quantities and remove the quantities we don't need
+            #   from the table.  Also turn Rick's -99's into None (I think!)
+            tp5ln10 = np.log( 10 ) * 2.5
+            hostgal.add_column( 10. ** (-0.4 * ( hostgal['mag_r'] - 31.4 ) ), name='petroflux_r' )
+            hostgal.add_column( tp5ln10 * hostgal['mag_r_err'] * hostgal['petroflux_r'], name='petroflux_r_err' )
+            hostgal[hostgal['mag_r'] < 0]['petroflux_r' ] = None
+            hostgal[hostgal['mag_r'] < 0]['petroflux_r_err' ] = None
+
+            bands = [ 'u', 'g', 'r', 'i', 'z', 'y' ]
+            for bandi in range( len(bands)-1 ):
+                hostgal.add_column( hostgal[f'mag_{bands[bandi]}'] - hostgal[f'mag_{bands[bandi+1]}'],
+                                    name=f'stdcolor_{bands[bandi]}_{bands[bandi+1]}' )
+                hostgal.add_column( np.sqrt( hostgal[f'mag_{bands[bandi]}']**2 + hostgal[f'mag_{bands[bandi+1]}']**2 ),
+                                    name=f'stdcolor_{bands[bandi]}_{bands[bandi+1]}_err' )
+                hostgal[ hostgal[f'mag_{bands[bandi]}'] < 0][f'stdcolor_{bands[bandi]}_{bands[bandi+1]}' ] = None
+                hostgal[ hostgal[f'mag_{bands[bandi+1]}'] < 0][f'stdcolor_{bands[bandi]}_{bands[bandi+1]}' ] = None
+                hostgal[ hostgal[f'mag_{bands[bandi]}'] < 0][f'stdcolor_{bands[bandi]}_{bands[bandi+1]}_err' ] = None
+                hostgal[ hostgal[f'mag_{bands[bandi+1]}'] < 0][f'stdcolor_{bands[bandi]}_{bands[bandi+1]}_err' ] = None
+
+            for bandi in bands:
+                hostgal.remove_column( f'mag_{bandi}'  )
+                hostgal.remove_column( f'mag_{bandi}_err' )
+
             if not self.ppdb:
                 hostgal.add_column( self.processing_version, name='processing_version' )
+
+            # At this point, hostgal should be ready for feeding to bulk_insert_or_upsert
+            #   (onced processed through dict()).
 
             # Build the diaobject table in head
             self.diaobject_map_columns( head )
