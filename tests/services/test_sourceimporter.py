@@ -20,13 +20,15 @@ def import_first30days_objects( barf, alerts_30days_sent_and_brokermessage_consu
         si = SourceImporter( procver.id )
         with db.MG() as mongoclient:
             collection = db.get_mongo_collection( mongoclient, collection_name )
-            n = si.import_objects_from_collection( collection, t1=t1 )
+            nobj, nroot = si.import_objects_from_collection( collection, t1=t1 )
 
-        yield n
+        yield nobj, nroot
     finally:
         with db.DB() as conn:
             cursor = conn.cursor()
             # We can be cavalier here becasue diaobject was supposed to be empty when we started
+            cursor.execute( "DELETE FROM diaobject_root_map" )
+            cursor.execute( "DELETE FROM root_diaobject" )
             cursor.execute( "DELETE FROM diaobject" )
             conn.commit()
 
@@ -104,15 +106,17 @@ def import_next60days_noprv( barf, procver,
         si = SourceImporter( procver.id )
         with db.MG() as mongoclient:
             collection = db.get_mongo_collection( mongoclient, collection_name )
-            nobj = si.import_objects_from_collection( collection, t0=t0, t1=t1 )
+            nobj, nroot = si.import_objects_from_collection( collection, t0=t0, t1=t1 )
             nsrc = si.import_sources_from_collection( collection, t0=t0, t1=t1 )
 
-        yield nobj, nsrc
+        yield nobj, nroot, nsrc
     finally:
         with db.DB() as conn:
             cursor = conn.cursor()
             cursor.execute( "DELETE FROM diaforcedsource" )
             cursor.execute( "DELETE FROM diasource" )
+            cursor.execute( "DELETE FROM diaobject_root_map" )
+            cursor.execute( "DELETE FROM root_diaobject" )
             cursor.execute( "DELETE FROM diaobject" )
             conn.commit()
 
@@ -152,12 +156,12 @@ def import_30days_60days( barf, procver, import_30days_prvsources, import_30days
         si = SourceImporter( procver.id )
         with db.MG() as mongoclient:
             collection = db.get_mongo_collection( mongoclient, collection_name )
-            nobj = si.import_objects_from_collection( collection, t0=t0, t1=t1 )
+            nobj, nroot = si.import_objects_from_collection( collection, t0=t0, t1=t1 )
             nsrc = si.import_sources_from_collection( collection, t0=t0, t1=t1 )
             nprvsrc = si.import_prvsources_from_collection( collection, t0=t0, t1=t1 )
             nprvfrc = si.import_prvforcedsources_from_collection( collection, t0=t0, t1=t1 )
 
-        yield nobj, nsrc, nprvsrc, nprvfrc
+        yield nobj, nroot, nsrc, nprvsrc, nprvfrc
     finally:
         # Parent fixtures do cleanup
         pass
@@ -304,12 +308,25 @@ def test_read_mongo_previous_forced_sources( barf, alerts_30days_sent_and_broker
 
 
 def test_import_objects( import_first30days_objects ):
-    assert import_first30days_objects == 12
+    nobj, nroot = import_first30days_objects
+    assert nobj == 12
+    assert nroot == 12
     with db.DB() as conn:
         cursor = conn.cursor()
         cursor.execute( "SELECT * FROM diaobject" )
-        rows = cursor.fetchall()
-    assert len(rows) == 12
+        objrows = cursor.fetchall()
+        objcols = { cursor.description[i].name: i for i in range( len(cursor.description) ) }
+        assert len(objrows) == 12
+
+        cursor.execute( "SELECT COUNT(*) FROM root_diaobject" )
+        assert cursor.fetchone()[0] == 12
+
+        cursor.execute( "SELECT * FROM diaobject_root_map" )
+        drmrows = cursor.fetchall()
+        drmcols = { cursor.description[i].name: i for i in range( len(cursor.description) ) }
+
+        assert set( r[drmcols['diaobjectid']] for r in drmrows ) == set( r[objcols['diaobjectid']] for r in objrows )
+        assert all( r[drmcols['processing_version']] == objrows[0][objcols['processing_version']] for r in drmrows )
 
     # TODO : look at more?  Compare ppdb_diaobject to diaobject?
 
@@ -389,14 +406,16 @@ class TestImport:
             with db.MG() as mongoclient:
                 collection = db.get_mongo_collection( mongoclient, collection_name )
                 si = SourceImporter( procver.id )
-                nobj, nsrc, nfrc = si.import_from_mongo( collection )
+                nobj, nroot, nsrc, nfrc = si.import_from_mongo( collection )
 
-            yield nobj, nsrc, nfrc, tsent, datetime.datetime.now( tz=datetime.UTC )
+            yield nobj, nroot, nsrc, nfrc, tsent, datetime.datetime.now( tz=datetime.UTC )
         finally:
             with db.DB() as conn:
                 cursor = conn.cursor()
                 cursor.execute( "DELETE FROM diaforcedsource" )
                 cursor.execute( "DELETE FROM diasource" )
+                cursor.execute( "DELETE FROM diaobject_root_map" )
+                cursor.execute( "DELETE FROM root_diaobject" )
                 cursor.execute( "DELETE FROM diaobject" )
                 cursor.execute( "DELETE FROM diasource_import_time WHERE collection=%(col)s",
                                 { 'col': collection_name} )
@@ -406,8 +425,9 @@ class TestImport:
     def test_run_import_30days( self, barf, run_import_30days ):
         collection_name = f'fastdb_{barf}'
 
-        nobj, nsrc, nfrc, tsent, t30 = run_import_30days
+        nobj, nroot, nsrc, nfrc, tsent, t30 = run_import_30days
         assert nobj == 12
+        assert nroot == 12
         assert nsrc == 77
         assert nfrc == 148
         with db.DB() as conn:
@@ -432,7 +452,7 @@ class TestImport:
     def test_run_import_30days_60days( self, barf, procver, run_import_30days,
                                        alerts_60moredays_sent_and_brokermessage_consumed
                                       ):
-        nobj30, nsrc30, nfrc30, t30send, t30 = run_import_30days
+        nobj30, nroot30, nsrc30, nfrc30, t30send, t30 = run_import_30days
         t60send = alerts_60moredays_sent_and_brokermessage_consumed
         collection_name = f'fastdb_{barf}'
 
@@ -448,17 +468,24 @@ class TestImport:
             with db.MG() as mongoclient:
                 collection = db.get_mongo_collection( mongoclient, collection_name )
                 si = SourceImporter( procver.id )
-                nobj, nsrc, nfrc = si.import_from_mongo( collection )
+                nobj, nroot, nsrc, nfrc = si.import_from_mongo( collection )
             t1 = datetime.datetime.now( tz=datetime.UTC )
 
             assert nobj30 == 12
+            assert nroot30 == 12
             assert nsrc30 == 77
             assert nfrc30 == 148
+            assert nobj == 25
+            assert nroot == 25
+            assert nsrc == 104
+            assert nfrc == 707
 
             with db.DB() as conn:
                 cursor = conn.cursor()
                 cursor.execute( "SELECT COUNT(*) FROM diaobject" )
                 totobj = cursor.fetchone()[0]
+                cursor.execute( "SELECT COUNT(*) FROM root_diaobject" )
+                totroot = cursor.fetchone()[0]
                 cursor.execute( "SELECT COUNT(*) FROM diasource" )
                 totsrc = cursor.fetchone()[0]
                 cursor.execute( "SELECT COUNT(*) FROM diaforcedsource" )
@@ -468,6 +495,7 @@ class TestImport:
                 t60 = cursor.fetchone()[0]
 
             assert totobj == 37
+            assert totroot == 37
             assert totsrc == 181
             assert totfrc == 855
             assert totobj == nobj + nobj30
@@ -496,9 +524,11 @@ class TestImport:
 #   get pulled in with the direct source import.
 
 def test_import_next60days( import_next60days_noprv ):
-    nsources, nforced = import_next60days_noprv
-    assert nsources == 29
-    assert nforced == 104
+    nobj, nroot, nsrc = import_next60days_noprv
+    assert nobj == 29
+    assert nroot == 29
+    assert nsrc == 104
+
     with db.DB() as conn:
         cursor = conn.cursor()
         cursor.execute( "SELECT * FROM diasource" )
@@ -506,10 +536,16 @@ def test_import_next60days( import_next60days_noprv ):
         sources = cursor.fetchall()
         cursor.execute( "SELECT * FROM diaobject" )
         objects = cursor.fetchall()
+        cursor.execute( "SELECT * FROM root_diaobject" )
+        roots = cursor.fetchall()
+        cursor.execute( "SELECT * FROM diaobject_root_map" )
+        objectmaps = cursor.fetchall()
         cursor.execute( "SELECT * FROM diaforcedsource" )
         forced = cursor.fetchall()
 
     assert len(objects) == 29
+    assert len(roots) == 29
+    assert len(objectmaps) == 29
     assert len(sources) == 104
     assert len(forced) == 0
     # The min mjd should be greater than the max mjd from test_import_sources
@@ -528,10 +564,13 @@ def test_import_next60days_with_prev( import_next60days_prv ):
         sources = cursor.fetchall()
         cursor.execute( "SELECT * FROM diaobject" )
         objects = cursor.fetchall()
+        cursor.execute( "SELECT * FROM diaobject_root_map" )
+        objrootmap = cursor.fetchall()
         cursor.execute( "SELECT * FROM diaforcedsource" )
         forced = cursor.fetchall()
 
     assert len(objects) == 29
+    assert len(objrootmap) == 29
     # len(sources) is not the same as nprvsources because nprvsources are only the sources added from
     #   previousDiaSource in all the alerts.
     assert len(sources) == 152
@@ -548,8 +587,9 @@ def test_import_next60days_with_prev( import_next60days_prv ):
 # Now make sure that if we import 30 days, then import 60 days, we get what's expected
 
 def test_import_30days_60days( import_30days_60days ):
-    nobj, nsrc, nprvsrc, nprvfrc = import_30days_60days
+    nobj, nroot, nsrc, nprvsrc, nprvfrc = import_30days_60days
     assert nobj == 25
+    assert nroot == 25
     assert nsrc == 104
     assert nprvsrc == 0   # at this point, anything that could be imported has been
     assert nprvfrc == 707
@@ -560,6 +600,8 @@ def test_import_30days_60days( import_30days_60days ):
         sources = cursor.fetchall()
         cursor.execute( "SELECT * FROM diaobject" )
         objects = cursor.fetchall()
+        cursor.execute( "SELECT * FROM diaobject_root_map" )
+        objrootmap = cursor.fetchall()
         cursor.execute( "SELECT * FROM diaforcedsource" )
         forced = cursor.fetchall()
 
@@ -567,6 +609,7 @@ def test_import_30days_60days( import_30days_60days ):
     #   from the import of days 60-90, so are lower than the total numbers
     #   in the tables below.
     assert len(objects) == 37
+    assert len(objrootmap) == 37
     assert len(sources) == 181
     assert len(forced) == 855
     assert min( r[sourcecoldex['midpointmjdtai']] for r in sources ) == pytest.approx( 60278.029, abs=0.01 )

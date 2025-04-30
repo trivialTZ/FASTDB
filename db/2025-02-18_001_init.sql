@@ -160,9 +160,8 @@ CREATE TABLE diaobject_root_map(
   processing_version integer NOT NULL,
   PRIMARY KEY ( rootid, diaobjectid, processing_version )
 );
-CREATE INDEX idx_diaobject_root_map_rootid ON diaobject_root_map(rootid);
-CREATE INDEX idx_diaobject_root_map_diaobjectid ON diaobject_root_map(diaobjectid);
-CREATE INDEX idx_diaobject_root_map_procver ON diaobject_root_map(processing_version);
+CREATE UNIQUE INDEX idx_diaobject_root_map_rootid ON diaobject_root_map(rootid);
+CREATE UNIQUE INDEX idx_diaobject_root_map_diaobjectid_procver ON diaobject_root_map(diaobjectid,processing_version);
 ALTER TABLE diaobject_root_map ADD CONSTRAINT fk_diobjrmap_rootid
   FOREIGN KEY (rootid) REFERENCES root_diaobject(id) ON DELETE RESTRICT;
 ALTER TABLE diaobject_root_map ADD CONSTRAINT fk_diobjrmap_diaobject
