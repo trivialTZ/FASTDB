@@ -1,9 +1,6 @@
-import datetime
-import astropy.time
-
 import flask
 
-import db
+import ltcv
 from webserver.baseview import BaseView
 
 
@@ -16,129 +13,16 @@ class GetHotTransients( BaseView ):
         if not flask.request.is_json:
             raise TypeError( "POST data was not JSON" )
         data = flask.request.json
-
-        mjdnow = None
-        mjd0 = None
-        include_object_hostinfo = False
-        procver = 'default'
-        procvergiven = False
-
-        if 'processing_version' in data:
-            procver = data[ 'processing_version' ].strip()
-            procvergiven = True
-            del data[ 'processing_version' ]
-
-        if 'return_format' in data:
-            return_format = int( data['return_format'] )
-            if return_format not in ( 0, 1, 2 ):
-                return "GetHotTransients: unknown return format {data['return_format']}", 500
-            del data['return_format']
+        kwargs = {}
+        if 'procesing_version' not in data:
+            kwargs['processing_version'] = 'default'
+        kwargs.update( data )
+        if 'return_format' in kwargs:
+            return_format = kwargs['return_format']
+            del kwargs['return_format']
         else:
             return_format = 0
-
-        if 'detected_since_mjd' in data:
-            if 'detected_in_last_days' in data:
-                return "Error, only give one of detected_since_mjd or detected_in_last_days", 500
-            mjd0 = float( data['detected_since_mjd'] )
-            del data['detected_since_mjd']
-        else:
-            lastdays = 30
-            if 'detected_in_last_days' in data:
-                lastdays = float( data['detected_in_last_days'] )
-                del data['detected_in_last_days']
-
-        if 'mjd_now' in data:
-            mjdnow = float( data['mjd_now'] )
-            if mjd0 is None:
-                mjd0 = mjdnow - lastdays
-                del data['mjd_now']
-        elif mjd0 is None:
-            mjd0 = astropy.time.Time( datetime.datetime.now( datetime.UTC  )
-                                      - datetime.timedelta( days=lastdays ) ).mjd
-
-        if 'include_hostinfo' in data:
-            if data[ 'include_hostinfo' ]:
-                include_object_hostinfo = True
-            del data[ 'include_hostinfo' ]
-
-        if len(data) != 0:
-            return f"Error, unknown parameters passed in request body: {list(data.keys())}", 500
-
-        bands = [ 'u', 'g', 'r', 'i', 'z', 'y' ]
-
-        with db.DB() as con:
-            with con.cursor() as cursor:
-                # Figure out the processing version
-                cursor.execute( "SELECT id FROM processing_version WHERE description=%(procver)s",
-                                { 'procver': procver } )
-                rows = cursor.fetchall()
-                if len(rows) == 0:
-                    cursor.execute( "SELECT id FROM processing_version_alias WHERE description=%(procver)s",
-                                    { 'procver': procver } )
-                    rows = cursor.fetchall()
-                if len(rows) == 0:
-                    if procvergiven:
-                        return f"Could not find processing version '{procver}'", 500
-                    else:
-                        return "No processing version, and could not find processing version 'default'", 500
-                procver = rows[0][0]
-
-                # Try to wrangle postgres into doing this more
-                #  efficiently than it would by default.  I'm not sure
-                #  I've done it all right here (in particular, the
-                #  NoBitmapScan), but I do think that postgres makes bad
-                #  choices about indexes into the forced source tables.
-                #  When looking at the forced source table, we really
-                #  want it to filter on object id *first*, before trying
-                #  to do any mjd or other filters, because that's what's
-                #  going to cut down the number of things to think about
-                #  the most (by up to a factor of 10⁶).  Postgres
-                #  sometimes seems to think that another index scan
-                #  first is better.  Perhaps we could try to play games
-                #  with postgres' table statistics collection to avoid
-                #  misinforming Postgres' query optimizer, but it's
-                #  easier just to use the hinting extension.
-
-                q = ( "/*+ NoBitmapScan(elasticc2_diasource)\n"
-                      "*/\n"
-                      "SELECT DISTINCT ON(dorm.id) root_diaobject_id "
-                      "INTO TEMP TABLE tmp_objids "
-                      "FROM diaobject_root_map dorm.id "
-                      "INNER JOIN diasource s ON (s.diaobjectid=dorm.diabojectid AND "
-                      "                           s.processing_version=dorm.processing_version )"
-                      "WHERE s.processing_version=%(procver)s AND s.midpointmjdtai>=%(t0)s" )
-                if mjdnow is not None:
-                    q += "  AND midpointmjdtai<=%(t1)s"
-                cursor.execute( q, { 'procver': procver, 't0': mjd0, 't1': mjdnow } )
-
-
-                q = ( "/* IndexScan(f diaobject_id)\n"
-                      "   IndexScan(o)\n"
-                      "*/\n"
-                      "SELECT r.root_diaobject_id AS root_diaobject_id, o.ra AS ra, o.dec AS dec,"
-                     )
-                if include_object_hostinfo:
-                    for bandi in range( len(bands)-1 ):
-                        q += ( f"h.stdcolor_{bands[bandi]}_{bands[bandi+1]},"
-                               f"h.stdcolor_{bands[bandi]}_{bands[bandi+1]}_err," )
-                    q += "h.petroflux_r,h.petroflux_r_err,o.nearbyextobj1sep,h.pzmean,h.pzstd,"
-                q += ( "     f.diaforcedsourceid,f.visit,f.detector,f.midpointmjdtai,f.band,"
-                       "     f.psfflux,f.psffluxerr"
-                       "FROM diaforcedsource f "
-                       "INNER JOIN diaobject o ON (f.diaobjectid=o.diaobjectid AND "
-                       "                           f.diaobject_procver=o.processing_version )"
-                       "INNER JOIN diaobject_root_map r ON (o.diaobjectid=r.diaobject_id AND "
-                       "                                    o.processing_version=r.processing_version) " )
-                if include_object_hostinfo:
-                    q += "INNER JOIN host_galaxy h ON o.nearbyextobj1id=h.id "
-                q += ( "WHERE r.rootid IN (SELECT root_diaobject_id FROM tmp_objids) "
-                       "  AND f.processing_verison=%(procver)s" )
-                if mjdnow is not None:
-                    q += "  AND f.midpointmjdtai<=%(t1)s "
-                q += "ORDER BY r.root_diaobject_id,f.midpointmjdtai"
-
-                cursor.execute( q, { "procver": procver, "t0": mjd0, "t1": mjdnow } )
-                columns = [ cursor.description[i][0] for i in range( len(cursor.description) ) ]
+        df = ltcv.get_hot_ltcvs( **kwargs )
 
         if ( return_format == 0 ) or ( return_format == 1 ):
             sne = []
@@ -153,7 +37,7 @@ class GetHotTransients( BaseView ):
                     'zp': [],
                     'redshift': [],
                     'sncode': [] }
-            if include_object_hostinfo:
+            if include_hostinfo:
                 sne[ 'hostgal_petroflux_r' ] = []
                 sne[ 'hostgal_petroflux_r_err' ] = []
                 sne[ 'hostgal_snsep' ] = []
@@ -191,7 +75,7 @@ class GetHotTransients( BaseView ):
                               'zp': 31.4,
                               'redshift': -99,
                               'sncode': -99 }
-                    if include_object_hostinfo:
+                    if include_hostinfo:
                         toadd[ 'hostgal_petroflux_r' ] = subdf.hostgal_petroflux_r.values[0]
                         toadd[ 'hostgal_petroflux_r_err' ] = subdf.hostgal_petroflux_r_err.values[0]
                         toadd[ 'hostgal_snsep' ] = subdf.nearbyextobj1sep.values[0]
@@ -225,7 +109,7 @@ class GetHotTransients( BaseView ):
                     sne['zp'].append( 31.4 )
                     sne['redshift'].append( -99 )
                     sne['sncode'].append( -99 )
-                    if include_object_hostinfo:
+                    if include_hostinfo:
                         sne[ 'hostgal_petroflux_r' ].append( subdf['hostgal_petroflux_r'].values[0] )
                         sne[ 'hostgal_petroflux_r_err'] .append( subdf['hostgal_petroflux_r_err'].values[0] )
                         sne[ 'hostgal_snsep' ].append( subdf['nearbyexstobj1sep'].values[0] )
@@ -244,6 +128,7 @@ class GetHotTransients( BaseView ):
         return { 'status': 'ok',
                  'diaobject': sne }
         return resp
+
 
 
 

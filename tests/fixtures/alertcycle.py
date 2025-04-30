@@ -9,6 +9,7 @@ import multiprocessing
 
 from services.projectsim import AlertSender
 from services.brokerconsumer import BrokerConsumer
+from services.source_importer import SourceImporter
 from util import logger
 import db
 
@@ -166,3 +167,36 @@ def alerts_60moredays_sent_and_brokermessage_consumed( barf, alerts_60moredays_s
         # (which is required by the alerts_60moredays_sent fixture
         # that this fixtured rquire) will do that cleanup.
         pass
+
+
+# This next fixture assumes that the root_diaobject, diaobject,
+#   diasource, and diaforcedsource tables all start empty, and
+#   completely wipes them out at the end.  Don't use it if that
+#   assumption doesn't hold.
+# (There may be a more efficient way to do this, e.g. dump the
+#  resultant database tables to a file somewhere and just
+#  load them up here!  Since we're not testing the pieces
+#  of the alert cycle for something that uses this fixture,
+#  we don't need to go through all the steps above.  That would
+#  mean more maintenance, as we'd have to update all the dumps
+#  any time database structures changed.)
+@pytest.fixture( scope='module' )
+def alerts_90days_sent_received_and_imported( barf, procver, alerts_60moredays_sent_and_brokermessage_consumed ):
+    collection_name = f'fastdb_{barf}'
+    try:
+        si = SourceImporter( procver.id )
+        with db.MG() as mongoclient:
+            collection = db.get_mongo_collection( mongoclient, collection_name )
+            nobj, nroot, nsrc, nfrc = si.import_from_mongo( collection )
+        yield nobj, nroot, nsrc, nfrc
+    finally:
+        with db.DB() as conn:
+            cursor = conn.cursor()
+            cursor.execute( "DELETE FROM diaforcedsource" )
+            cursor.execute( "DELETE FROM diasource" )
+            cursor.execute( "DELETE FROM diaobject_root_map" )
+            cursor.execute( "DELETE FROM root_diaobject" )
+            cursor.execute( "DELETE FROM diaobject" )
+            cursor.execute( "DELETE FROM diasource_import_time WHERE collection=%(col)s",
+                            { 'col': collection_name } )
+            conn.commit()
