@@ -8,10 +8,11 @@ from db import DB
 
 class BaseTestDB:
     # Derived classes must define a fixture basetest_setup which defines the following:
-    #     self.cls : The class we're testing (a subclass of DBBase)
-    #     self.columns : Set, the names of the columns in the class
-    #     self.safe_to_modify : list of columns that aren't part of a unique, foreign key, or primary key constraint
-    #                           They should have different values in all of dict1, dict2, dict3
+    #     self.cls : str, the class we're testing (a subclass of DBBase)
+    #     self.columns : set, the names of the columns in the class
+    #     self.safe_to_modify : list (not set!) of columns that aren't part of a unique, foreign key, or
+    #                           primary key constraint. They should have different values in all of
+    #                           dict1, dict2, dict3
     #     self.uniques : list of columns that have a solo unique constraint but arent pk or fk
     #     self.obj1 : An object of the class, built manually, not inserted
     #     self.dict1 : A dictionary with key: value corresponding to the table, for self.obj1

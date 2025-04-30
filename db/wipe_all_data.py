@@ -1,10 +1,10 @@
 # TODO : wrap this with --do and --really-do options
 
 # Empty out all data tables, don't remove users
-data_tables = [ 'processing_version', 'snapshot',
+data_tables = [ 'processing_version','processing_version_alias', 'snapshot',
                 'host_galaxy', 'root_diaobject', 'diaobject', 'diasource', 'diaforcedsource',
                 'diaobject_root_map', 'diaobject_snapshot', 'diasource_snapshot', 'diaforcedsource_snapshot',
-                'query_queue' ]
+                'query_queue', 'spectruminfo', 'wantedspectra', 'plannedspectra' ]
 
 import sys
 import psycopg

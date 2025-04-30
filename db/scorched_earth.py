@@ -1,10 +1,11 @@
 # TODO : wrap this with --do and --really-do options
 
 all_tables = [ 'authuser', 'passwordlink',
-               'processing_version', 'snapshot',
+               'processing_version', 'processing_version_alias', 'snapshot',
                'host_galaxy', 'root_diaobject', 'diaobject', 'diasource', 'diaforcedsource',
                'diaobject_root_map', 'diaobject_snapshot', 'diasource_snapshot', 'diaforcedsource_snapshot',
-               'query_queue', 'migrations_applied' ]
+               'query_queue', 'migrations_applied',
+               'spectruminfo', 'watnedspectra', 'plannedspectra' ]
 
 import sys
 import psycopg

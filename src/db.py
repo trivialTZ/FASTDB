@@ -784,6 +784,14 @@ class ProcessingVersion( DBBase ):
 
 # ======================================================================
 
+class ProcessingVersionAlias( DBBase ):
+    __tablename__ = "processing_version_alias"
+    _tablemeta = None
+    _pk = [ 'description' ]
+
+
+# ======================================================================
+
 class Snapshot( DBBase ):
     __tablename__ = "snapshot"
     _tablemeta = None
@@ -860,6 +868,27 @@ class DiaForcedSourceSnapshot( DBBase ):
     __tablename__ = "diaforcedsource_snapshot"
     _tablemeta = None
     _pk = [ 'diaforcedsourceid', 'processing_version', 'snapshot' ]
+
+
+# ======================================================================
+# Spectrum cycle tables
+
+class SpectrumInfo( DBBase ):
+    __tablename__ = "spectruminfo"
+    _tablemeta = None
+    _pk = [ 'specinfo_id' ]
+
+
+class WantedSpectra( DBBase ):
+    __tablename__ = "wantedspectra"
+    _tablemeta = None
+    _pk = [ 'wantspec_id' ]
+
+
+class PlannedSpectra( DBBase ):
+    __tablename__ = "plannedspectra"
+    _tablemeta = None
+    _pk = [ 'plannedspec_id' ]
 
 
 # ======================================================================
