@@ -52,7 +52,7 @@ def get_hot_ltcvs( processing_version, detected_since_mjd=None, detected_in_last
 
       Returns
       -------
-        ( pandas.DataFrame, pandas.DataFrame )
+        ( pandas.DataFrame, pandas.DataFrame or None )
 
         A 2-element tuple.  The first will be a pandas DataFrame, the
         second will either be another DataFrame or None.  No indexes
@@ -69,7 +69,7 @@ def get_hot_ltcvs( processing_version, detected_since_mjd=None, detected_in_last
            visit -- the visit number
            detector -- the detector number
            midpointmjdtai -- the MJD of the obervation
-           band -- the filter (u, g, r, i, z, or y)  (Not sure if you get 'y' or 'Y'.)
+           band -- the filter (u, g, r, i, z, or Y)
            psfflux -- the PSF flux in nJy
            psffluxerr --- uncertaintly on psfflux in nJy
            is_source -- bool.  If you specified source_aptch=False, this
@@ -80,7 +80,7 @@ def get_hot_ltcvs( processing_version, detected_since_mjd=None, detected_in_last
                           then sourceid is the diasourceid; if is_source
                           is False, then sourceid is the
                           diaforcedsourceid.
-    
+
        The second member of the tuple will be None unless you specified
        include_hostinfo.  If include_hostinfo is true, then it's a
        dataframe with the following columns.  Note that the root id does
@@ -149,26 +149,10 @@ def get_hot_ltcvs( processing_version, detected_since_mjd=None, detected_in_last
                 raise ValueError( f"Could not find processing version '{processing_version}'" )
             procver = rows[0][0]
 
-            # Try to wrangle postgres into doing this more
-            #  efficiently than it would by default.  I'm not sure
-            #  I've done it all right here (in particular, the
-            #  NoBitmapScan), but I do think that postgres makes bad
-            #  choices about indexes into the forced source tables.
-            #  When looking at the forced source table, we really
-            #  want it to filter on object id *first*, before trying
-            #  to do any mjd or other filters, because that's what's
-            #  going to cut down the number of things to think about
-            #  the most (by up to a factor of 10⁶).  Postgres
-            #  sometimes seems to think that another index scan
-            #  first is better.  Perhaps we could try to play games
-            #  with postgres' table statistics collection to avoid
-            #  misinforming Postgres' query optimizer, but it's
-            #  easier just to use the hinting extension.
-
             # First : get a table of all the object ids (root object ids)
             #   that have a detection (i.e. a diasource) in the
             #   desired time period.
-            
+
             q = ( "/*+ NoBitmapScan(elasticc2_diasource)\n"
                   "*/\n"
                   "SELECT DISTINCT ON(dorm.rootid) rootid "
@@ -196,7 +180,7 @@ def get_hot_ltcvs( processing_version, detected_since_mjd=None, detected_in_last
                        "                            r.processing_version=o.processing_version ) "
                        "INNER JOIN host_galaxy h ON o.nearbyextobj1id=h.id "
                        "WHERE r.rootid IN (SELECT rootid FROM tmp_objids) "
-                       "  AND o.processing_version=%(procver)s"
+                       "  AND o.processing_version=%(procver)s "
                        "ORDER BY r.rootid" )
                 cursor.execute( q, { 'procver': procver} )
                 columns = [ cursor.description[i][0] for i in range( len(cursor.description) ) ]
@@ -204,8 +188,13 @@ def get_hot_ltcvs( processing_version, detected_since_mjd=None, detected_in_last
 
 
             # Third : pull out all the forced photometry
-            q = ( "/* IndexScan(f idx_diaforcedsource_diaobjectidpv)\n"
-                  "   IndexScan(o)\n"
+            # THOUGHT REQUIRED : do we want midmpointmjdtai to stop at mjd_now-1 rather
+            #   than mjd_now?  It depends what you mean.  If you want mjd_now to mean
+            #   "data through this date" then don't stop a day early.  If you mean
+            #   "simulate what we knew on this date"), then do stop a day early, because
+            #   forced photometry will be coming out with a delay of a ~day.
+            q = ( "/*+ IndexScan(f idx_diaforcedsource_diaobjectidpv)\n"
+                  "    IndexScan(o)\n"
                   "*/\n"
                   "SELECT r.rootid AS rootid, o.ra AS ra, o.dec AS dec,"
                    "     f.diaforcedsourceid AS sourceid,f.visit,f.detector,f.midpointmjdtai,f.band,"
@@ -224,17 +213,19 @@ def get_hot_ltcvs( processing_version, detected_since_mjd=None, detected_in_last
             columns = [ cursor.description[i][0] for i in range( len(cursor.description) ) ]
             forceddf = pandas.DataFrame( cursor.fetchall(), columns=columns )
             forceddf['is_source'] = False
-            
+
             # Fourth: if we've been asked to patch in sources where forced sources are
-            #   missing, pull those down.
+            #   missing, pull those down and concatenate them into the dataframe.
+            # TODO : figure out the right hints to give when these tables
+            #   are big!
             sourcedf = None
             if source_patch:
-                q = ( "/* IndexScan(s idx_diasource_diaobjectidpv)\n"
-                      "   IndexScan(f idx_diaforcedsource_diaobjectidpv)\n"
-                      "   IndexScan(o)\n"
+                q = ( "/*+ IndexScan(s idx_diasource_diaobjectidpv)\n"
+                      "    IndexScan(f idx_diaforcedsource_diaobjectidpv)\n"
+                      "    IndexScan(o)\n"
                       "*/\n"
-                      "SELECT r.rootid, o.ra, o.dec, s.sourceid,s.visit,s.detection,s.midpointmjdtai,s.band,"
-                      "       s.psfflux,s.psffluxerr "
+                      "SELECT r.rootid,o.ra,o.dec,s.diasourceid AS sourceid,s.visit,s.detector,"
+                      "       s.midpointmjdtai,s.band,s.psfflux,s.psffluxerr "
                       "FROM diasource s "
                       "INNER JOIN diaobject o ON (s.diaobjectid=o.diaobjectid AND "
                       "                           s.diaobject_procver=o.processing_version) "
@@ -248,12 +239,13 @@ def get_hot_ltcvs( processing_version, detected_since_mjd=None, detected_in_last
                       "  AND s.processing_version=%(procver)s "
                       "  AND f.diaobjectid IS NULL " )
                 if mjd_now is not None:
-                    q += "  AND s.midpointmjdtai<=(%t1)s "
+                    q += "  AND s.midpointmjdtai<=%(t1)s "
                 q += "ORDER BY r.rootid,s.midpointmjdtai"
-                cursor.execute( q, { "procvber": procver, "t1": mjd_now } )
+                cursor.execute( q, { "procver": procver, "t1": mjd_now } )
                 columns = [ cursor.description[i][0] for i in range( len(cursor.description) ) ]
                 sourcedf = pandas.DataFrame( cursor.fetchall(), columns=columns )
                 sourcedf['is_source'] = True
-                forceddf = pandas.concat( [ forceddf, sourcedf ], axis='columns' )
+                forceddf = pandas.concat( [ forceddf, sourcedf ], axis='index' )
+                forceddf.sort_values( [ 'rootid', 'midpointmjdtai' ], inplace=True )
 
     return forceddf, hostdf

@@ -1,3 +1,5 @@
+# CURRENTLY BROKEN, in the middle of being edited as fucntionality was moved to src/ltcv.py
+
 import flask
 
 import ltcv

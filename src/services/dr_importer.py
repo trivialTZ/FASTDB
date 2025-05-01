@@ -37,11 +37,9 @@ class DRImporter:
         with db.DB() as conn:
             cursor = conn.cursor()
 
-            # Figure out which host galaxies we don't know about yet.
-            # This procedure will potentially create some duplicate entries,
-            # but whatevs.
+            # Figure out which host galaxies we don't know about yet.  This procedure will
+            # potentially create some duplicate entries in the temp table, but whatevs.
             # TODO : think about ids, processing versions, etc.
-
             for i in range( 1, 4 ):
                 if i == 1:
                     q = "CREATE TEMP TABLE temp_missing_hosts AS "
@@ -55,6 +53,8 @@ class DRImporter:
                        f"    AND o.nearbyextobj{i} IS NOT NULL )" )
                 cursor.execute( q, { 'procver': self.processing_version } )
 
+            # Port over the missing objects from the ppdb_host_galaxy table to the host_galaxy table
+            # This is what would need to get replaced by a query of othe actual ppdb
             q = ( f"INSERT INTO host_galaxy({','.join(self.host_galaxy_cols)},processing_version) "
                   f"( SELECT {','.join(self.host_galaxy_cols)},%(procver)s FROM ppdb_host_galaxy "
                   f"  WHERE objectid IN (SELECT * FROM temp_missing_hosts) )" )
@@ -75,4 +75,3 @@ class DRImporter:
             conn.commit()
 
             return nhosts
-
