@@ -16,7 +16,7 @@ from db import ( ProcessingVersion,
                  Snapshot,
                  DB,
                  AuthUser )
-from util import asUUID
+from util import asUUID, logger
 
 sys.path.insert( 0, pathlib.Path(__file__).parent )
 # For cleanliness, a bunch of fixtures are broken
@@ -318,6 +318,7 @@ def snana_fits_ppdb_loaded():
         com.extend( dirs )
         com.append( "--do" )
 
+        logger.info( f"Running a subprocess with command: {com}" )
         res = subprocess.run( com, capture_output=True )
         assert res.returncode == 0
 

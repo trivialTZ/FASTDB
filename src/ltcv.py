@@ -7,7 +7,112 @@ import db
 
 
 def get_hot_ltcvs( processing_version, detected_since_mjd=None, detected_in_last_days=None,
-                   mjd_now=None, include_hostinfo=False ):
+                   mjd_now=None, source_patch=False, include_hostinfo=False ):
+    """Get lightcurves of objects with a recent detection.
+
+    Parameters
+    ----------
+      processing_version: string
+        The description of the processing version, or processing version
+        alias, to use for searching all tables.
+
+      detected_since_mjd: float, default None
+        If given, will search for all objects detected (i.e. with an
+        entry in the diasource table) since this mjd.
+
+      detected_in_last_days: float, default 30
+        If given, will search for all objects detected since this many
+        days before now.  Can't explicitly pass both this and
+        detected_since_mjd.  If detected_since_mjd is given, the default
+        here is ignored.
+
+      mjd_now : float, default None
+        What "now" is.  By default, this does an MJD conversion of
+        datetime.datetime.now(), which is usually what you want.  But,
+        for simulations or reconstructions, you might want to pretend
+        it's a different time.
+
+      source_path : bool, default Fals
+        Normally, returned light curves only return fluxes from the
+        diaforcedsource table.  However, during the campaign, there will
+        be sources detected for which there is no forced photometry.
+        (Alerts are sent as sources are detected, but forced photometry
+        is delayed.)  Set this to True to get more complete, but
+        heterogeneous, lightcurves.  When this is True, it will look for
+        all detections that don't have a corresponding forced photometry
+        point (i.e. observation of the same ojbject in the same visit),
+        and add the detections to the lightcurve.  Be aware that these
+        photometry points don't mean exactly the same thing, as forced
+        photometry is all at one position, but detections are where they
+        are.  This is useful for doing real-time filtering and the like,
+        but *not* for any kind of precision photometry or lightcurve fitting.
+
+      include_hostinfo : bool, default False
+        If true, return a second data frame with information about the hosts.
+
+      Returns
+      -------
+        ( pandas.DataFrame, pandas.DataFrame )
+
+        A 2-element tuple.  The first will be a pandas DataFrame, the
+        second will either be another DataFrame or None.  No indexes
+        will have been set in the dataframes.
+
+        The first one has the lightcurves.  It has columns:
+           rootid -- the object root ID from the database.  (TODO: document.)
+           sourceid -- either the diaforcedsourceid or the diasourceid
+                        from the database (see below)
+           ra -- the ra of the *object* (interpretation complicated).
+                   Will be the same for all rows with the same rootid.
+                   Decimal degrees, J2000.
+           dec -- the dec of the *object* (goes with ra).  Decmial degrees, J2000.
+           visit -- the visit number
+           detector -- the detector number
+           midpointmjdtai -- the MJD of the obervation
+           band -- the filter (u, g, r, i, z, or y)  (Not sure if you get 'y' or 'Y'.)
+           psfflux -- the PSF flux in nJy
+           psffluxerr --- uncertaintly on psfflux in nJy
+           is_source -- bool.  If you specified source_aptch=False, this
+                          will be False for all rows.  Otherwise, it's
+                          True for rows pulled from the diasource table,
+                          and False for rows pulled from the
+                          diaforcedsource table.  If is_source is True,
+                          then sourceid is the diasourceid; if is_source
+                          is False, then sourceid is the
+                          diaforcedsourceid.
+    
+       The second member of the tuple will be None unless you specified
+       include_hostinfo.  If include_hostinfo is true, then it's a
+       dataframe with the following columns.  Note that the root id does
+       *not* uniquely specify the host properties!  The
+       processing_version you gave will affect which rows were actually
+       pulled from the diaobject table.  (And it's potentially more
+       complicated than that....)  These are mostly defined based on
+       looking at the Object table as defined in the 2023-07-10 version
+       of the DPDD in Table 4.3.1, with some columns coming from the
+       DiaObject table defined by https://sdm-schemas.lsst.io/apdb.html
+       (accessed on 2024-04-30).
+
+           rootid --- the object root ID from the database.  Use this to
+                        match to the lightcurve data frame.
+           stdcolor_u_g -- "standard" colors as (not really) defined by the DPDD, in AB mags
+           stdcolor_g_r --
+           stdcolor_r_i --
+           stdcolor_i_z --
+           stdcolor_z_y --
+           stdcolor_u_g_err -- uncertainty on standard colors
+           stdcolor_g_r_err --
+           stdcolor_r_i_err --
+           stdcolor_i_z_err --
+           stdcolor_z_y_err --
+           petroflux_r -- the flux in nJy within some standard multiple of the petrosian radius
+           petroflux_r_err -- uncertainty on petroflux_r
+           nearbyextobj1sep -- "Second moment-based separation of nearbyExtObj1 (unitless)" [????]
+                               For SNANA-based sims, this is ROB FIGURE THIS OUT
+           pzmean -- mean photoredshift (nominally from the "photoZ_pest" column of the DPD Object table)
+           pzstd -- standard deviation of photoredshift (also nominally from "photoZ_pest")
+
+    """
 
     mjd0 = None
 
@@ -60,6 +165,10 @@ def get_hot_ltcvs( processing_version, detected_since_mjd=None, detected_in_last
             #  misinforming Postgres' query optimizer, but it's
             #  easier just to use the hinting extension.
 
+            # First : get a table of all the object ids (root object ids)
+            #   that have a detection (i.e. a diasource) in the
+            #   desired time period.
+            
             q = ( "/*+ NoBitmapScan(elasticc2_diasource)\n"
                   "*/\n"
                   "SELECT DISTINCT ON(dorm.rootid) rootid "
@@ -72,33 +181,79 @@ def get_hot_ltcvs( processing_version, detected_since_mjd=None, detected_in_last
                 q += "  AND midpointmjdtai<=%(t1)s"
             cursor.execute( q, { 'procver': procver, 't0': mjd0, 't1': mjd_now } )
 
-            q = ( "/* IndexScan(f diaobjectid)\n"
-                  "   IndexScan(o)\n"
-                  "*/\n"
-                  "SELECT r.rootid AS rootid, o.ra AS ra, o.dec AS dec,"
-                 )
+            # Second : pull out host info for those objects if requested
+            # TODO : right now it just pulls out nearby extended object 1.
+            # make it configurable to get up to all three.
+            hostdf = None
             if include_hostinfo:
+                q = "SELECT DISTINCT ON (r.rootid) r.rootid,"
                 for bandi in range( len(bands)-1 ):
                     q += ( f"h.stdcolor_{bands[bandi]}_{bands[bandi+1]},"
                            f"h.stdcolor_{bands[bandi]}_{bands[bandi+1]}_err," )
-                q += "h.petroflux_r,h.petroflux_r_err,o.nearbyextobj1sep,h.pzmean,h.pzstd,"
-            q += ( "     f.diaforcedsourceid,f.visit,f.detector,f.midpointmjdtai,f.band,"
+                q += ( "h.petroflux_r,h.petroflux_r_err,o.nearbyextobj1sep,h.pzmean,h.pzstd "
+                       "FROM diaobject_root_map r "
+                       "INNER JOIN diaobject o ON ( r.diaobjectid=o.diaobjectid AND "
+                       "                            r.processing_version=o.processing_version ) "
+                       "INNER JOIN host_galaxy h ON o.nearbyextobj1id=h.id "
+                       "WHERE r.rootid IN (SELECT rootid FROM tmp_objids) "
+                       "  AND o.processing_version=%(procver)s"
+                       "ORDER BY r.rootid" )
+                cursor.execute( q, { 'procver': procver} )
+                columns = [ cursor.description[i][0] for i in range( len(cursor.description) ) ]
+                hostdf = pandas.DataFrame( cursor.fetchall(), columns=columns )
+
+
+            # Third : pull out all the forced photometry
+            q = ( "/* IndexScan(f idx_diaforcedsource_diaobjectidpv)\n"
+                  "   IndexScan(o)\n"
+                  "*/\n"
+                  "SELECT r.rootid AS rootid, o.ra AS ra, o.dec AS dec,"
+                   "     f.diaforcedsourceid AS sourceid,f.visit,f.detector,f.midpointmjdtai,f.band,"
                    "     f.psfflux,f.psffluxerr "
                    "FROM diaforcedsource f "
                    "INNER JOIN diaobject o ON (f.diaobjectid=o.diaobjectid AND "
-                   "                           f.diaobject_procver=o.processing_version )"
+                   "                           f.diaobject_procver=o.processing_version) "
                    "INNER JOIN diaobject_root_map r ON (o.diaobjectid=r.diaobjectid AND "
-                   "                                    o.processing_version=r.processing_version) " )
-            if include_hostinfo:
-                q += "INNER JOIN host_galaxy h ON o.nearbyextobj1id=h.id "
-            q += ( "WHERE r.rootid IN (SELECT rootid FROM tmp_objids) "
+                   "                                    o.processing_version=r.processing_version) "
+                   "WHERE r.rootid IN (SELECT rootid FROM tmp_objids) "
                    "  AND f.processing_version=%(procver)s" )
             if mjd_now is not None:
                 q += "  AND f.midpointmjdtai<=%(t1)s "
             q += "ORDER BY r.rootid,f.midpointmjdtai"
-
-            cursor.execute( q, { "procver": procver, "t0": mjd0, "t1": mjd_now } )
+            cursor.execute( q, { "procver": procver, "t1": mjd_now } )
             columns = [ cursor.description[i][0] for i in range( len(cursor.description) ) ]
-            df = pandas.DataFrame( cursor.fetchall(), columns=columns )
+            forceddf = pandas.DataFrame( cursor.fetchall(), columns=columns )
+            forceddf['is_source'] = False
+            
+            # Fourth: if we've been asked to patch in sources where forced sources are
+            #   missing, pull those down.
+            sourcedf = None
+            if source_patch:
+                q = ( "/* IndexScan(s idx_diasource_diaobjectidpv)\n"
+                      "   IndexScan(f idx_diaforcedsource_diaobjectidpv)\n"
+                      "   IndexScan(o)\n"
+                      "*/\n"
+                      "SELECT r.rootid, o.ra, o.dec, s.sourceid,s.visit,s.detection,s.midpointmjdtai,s.band,"
+                      "       s.psfflux,s.psffluxerr "
+                      "FROM diasource s "
+                      "INNER JOIN diaobject o ON (s.diaobjectid=o.diaobjectid AND "
+                      "                           s.diaobject_procver=o.processing_version) "
+                      "INNER JOIN diaobject_root_map r ON (o.diaobjectid=r.diaobjectid AND "
+                      "                                    o.processing_version=r.processing_version) "
+                      "LEFT JOIN diaforcedsource f ON (f.diaobjectid=s.diaobjectid AND "
+                      "                                f.diaobject_procver=s.diaobject_procver AND "
+                      "                                f.visit=s.visit AND "
+                      "                                f.detector=s.detector) "
+                      "WHERE r.rootid IN (SELECT rootid FROM tmp_objids) "
+                      "  AND s.processing_version=%(procver)s "
+                      "  AND f.diaobjectid IS NULL " )
+                if mjd_now is not None:
+                    q += "  AND s.midpointmjdtai<=(%t1)s "
+                q += "ORDER BY r.rootid,s.midpointmjdtai"
+                cursor.execute( q, { "procvber": procver, "t1": mjd_now } )
+                columns = [ cursor.description[i][0] for i in range( len(cursor.description) ) ]
+                sourcedf = pandas.DataFrame( cursor.fetchall(), columns=columns )
+                sourcedf['is_source'] = True
+                forceddf = pandas.concat( [ forceddf, sourcedf ], axis='columns' )
 
-    return df
+    return forceddf, hostdf
