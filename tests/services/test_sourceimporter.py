@@ -1,8 +1,13 @@
+# At the moment, this also tests dr_importer.py
+
 import pytest
 import datetime
 
+import psycopg
+
 import db
 from services.source_importer import SourceImporter
+from services.dr_importer import DRImporter
 
 # Ordering of these tests matters, because they use module scope fixtures.
 # See the comment before class TestImport
@@ -30,6 +35,18 @@ def import_first30days_objects( barf, alerts_30days_sent_and_brokermessage_consu
             cursor.execute( "DELETE FROM diaobject_root_map" )
             cursor.execute( "DELETE FROM root_diaobject" )
             cursor.execute( "DELETE FROM diaobject" )
+            conn.commit()
+
+
+@pytest.fixture
+def import_first30days_hosts( import_first30days_objects, procver ):
+    try:
+        dri = DRImporter( procver.id )
+        yield dri.import_host_info()
+    finally:
+        with db.DB() as conn:
+            cursor = conn.cursor()
+            cursor.execute( "DELETE FROM host_galaxy" )
             conn.commit()
 
 
@@ -122,6 +139,18 @@ def import_next60days_noprv( barf, procver,
 
 
 @pytest.fixture
+def import_next60days_hosts( import_next60days_noprv, procver ):
+    try:
+        dri = DRImporter( procver.id )
+        yield dri.import_host_info()
+    finally:
+        with db.DB() as conn:
+            cursor = conn.cursor()
+            cursor.execute( "DELETE FROM host_galaxy" )
+            conn.commit()
+
+
+@pytest.fixture
 def import_next60days_prv( barf, procver, import_next60days_noprv,
                            alerts_30days_sent_and_brokermessage_consumed,
                            alerts_60moredays_sent_and_brokermessage_consumed ):
@@ -160,13 +189,16 @@ def import_30days_60days( barf, procver, import_30days_prvsources, import_30days
             nsrc = si.import_sources_from_collection( collection, t0=t0, t1=t1 )
             nprvsrc = si.import_prvsources_from_collection( collection, t0=t0, t1=t1 )
             nprvfrc = si.import_prvforcedsources_from_collection( collection, t0=t0, t1=t1 )
+        dri = DRImporter( procver.id )
+        nhosts = dri.import_host_info()
 
-        yield nobj, nroot, nsrc, nprvsrc, nprvfrc
+        yield nobj, nroot, nsrc, nprvsrc, nprvfrc, nhosts
     finally:
-        # Parent fixtures do cleanup
-        pass
-
-
+        # Parent fixtures do most cleanup, but not of hosts
+        with db.DB() as conn:
+            cursor = conn.cursor()
+            cursor.execute( "DELETE FROM host_galaxy" )
+            conn.commit()
 
 
 # **********************************************************************
@@ -331,6 +363,14 @@ def test_import_objects( import_first30days_objects ):
     # TODO : look at more?  Compare ppdb_diaobject to diaobject?
 
 
+def test_import_hosts( import_first30days_hosts ):
+    assert import_first30days_hosts == 18
+    with db.DB() as conn:
+        cursor = conn.cursor()
+        cursor.execute( "SELECT COUNT(*) FROM host_galaxy" )
+        assert cursor.fetchone()[0] == import_first30days_hosts
+
+
 def test_import_sources( import_first30days_sources ):
     assert import_first30days_sources == 77
     with db.DB() as conn:
@@ -374,7 +414,7 @@ def test_import_provforcedsources( import_30days_prvforcedsources ):
 # Yikes, OK.  pytest raises all kinds of issues.
 #
 # Background: the tests in alertcycle.py are module-scope tests because
-# they'res slow.  They're used in test modules other than this one, so I
+# they're slow.  They're used in test modules other than this one, so I
 # can't just put them in this file.
 #
 # Tests in this file are ordered so that all the ones that need the *60days*
@@ -553,6 +593,14 @@ def test_import_next60days( import_next60days_noprv ):
     assert max( r[sourcecoldex['midpointmjdtai']] for r in sources ) == pytest.approx( 60362.3266, abs=0.01 )
 
 
+def test_import_next60days_hosts( import_next60days_hosts ):
+    assert import_next60days_hosts == 30
+    with db.DB() as conn:
+        cursor = conn.cursor()
+        cursor.execute( "SELECT COUNT(*) FROM host_galaxy" )
+        assert cursor.fetchone()[0] == import_next60days_hosts
+
+
 def test_import_next60days_with_prev( import_next60days_prv ):
     nprvsources, nprvforced = import_next60days_prv
     assert nprvsources == 48
@@ -587,16 +635,16 @@ def test_import_next60days_with_prev( import_next60days_prv ):
 # Now make sure that if we import 30 days, then import 60 days, we get what's expected
 
 def test_import_30days_60days( import_30days_60days ):
-    nobj, nroot, nsrc, nprvsrc, nprvfrc = import_30days_60days
+    nobj, nroot, nsrc, nprvsrc, nprvfrc, nhosts = import_30days_60days
     assert nobj == 25
     assert nroot == 25
     assert nsrc == 104
     assert nprvsrc == 0   # at this point, anything that could be imported has been
     assert nprvfrc == 707
+    assert nhosts == 42
     with db.DB() as conn:
-        cursor = conn.cursor()
+        cursor = conn.cursor( row_factory=psycopg.rows.dict_row )
         cursor.execute( "SELECT * FROM diasource" )
-        sourcecoldex = { desc[0]: i for i, desc in enumerate(cursor.description) }
         sources = cursor.fetchall()
         cursor.execute( "SELECT * FROM diaobject" )
         objects = cursor.fetchall()
@@ -604,6 +652,8 @@ def test_import_30days_60days( import_30days_60days ):
         objrootmap = cursor.fetchall()
         cursor.execute( "SELECT * FROM diaforcedsource" )
         forced = cursor.fetchall()
+        cursor.execute( "SELECT * FROM host_galaxy" )
+        hosts = cursor.fetchall()
 
     # nobj, nrsc, nprvsrc, nprvfrc above are affected row counts returned
     #   from the import of days 60-90, so are lower than the total numbers
@@ -612,5 +662,13 @@ def test_import_30days_60days( import_30days_60days ):
     assert len(objrootmap) == 37
     assert len(sources) == 181
     assert len(forced) == 855
-    assert min( r[sourcecoldex['midpointmjdtai']] for r in sources ) == pytest.approx( 60278.029, abs=0.01 )
-    assert max( r[sourcecoldex['midpointmjdtai']] for r in sources ) == pytest.approx( 60362.3266, abs=0.01 )
+    assert len(hosts) == 42
+    assert min( r['midpointmjdtai'] for r in sources ) == pytest.approx( 60278.029, abs=0.01 )
+    assert max( r['midpointmjdtai'] for r in sources ) == pytest.approx( 60362.3266, abs=0.01 )
+
+    # Make sure hosts loaded match the hosts we thought should be loaded
+    hostids = set( [ h['id'] for h in hosts ] )
+    objhostids = set( [ o['nearbyextobj1id'] for o in objects if o['nearbyextobj1id'] is not None ] )
+    objhostids.update( [ o['nearbyextobj2id'] for o in objects if o['nearbyextobj2id'] is not None ] )
+    objhostids.update( [ o['nearbyextobj3id'] for o in objects if o['nearbyextobj3id'] is not None ] )
+    assert hostids == objhostids

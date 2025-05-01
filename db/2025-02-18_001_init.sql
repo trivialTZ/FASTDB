@@ -1,3 +1,15 @@
+-- NOTE : I've commented out all the partitioning below.
+-- Reason: I'm not convinced we'll really get performance
+--   improvements from it, and haven't done any tests
+--   to see if we will.  And, I fear there may be drawbacdks;
+--   I was seeing plan queries do things like sequential
+--   scans on partition tables to see if every row in the
+--   sub-table had a key that matched the key that defined
+--   the sub-table... which is really odd, why would postgres
+--   do that?  In any event, partitioned tables add complication,
+--   so figure out if we really need them and if they really
+--   help before using them.
+
 -- Tables used for the rkauth system
 CREATE TABLE authuser(
   id UUID NOT NULL DEFAULT gen_random_uuid(),
@@ -83,6 +95,7 @@ CREATE TABLE host_galaxy(
   flags bigint
 );
 CREATE INDEX idx_hostgalaxy_objectid ON host_galaxy(objectid);
+CREATE INDEX idx_hostgalaxy_procver ON host_galaxy(processing_version);
 CREATE INDEX idx_hostgalaxy_q3c ON host_galaxy(q3c_ang2ipix(ra, dec));
 
 
@@ -143,13 +156,16 @@ CREATE INDEX idx_diaobject_diaobjectid ON diaobject(diaobjectid);
 CREATE INDEX idx_diaobject_procver ON diaobject(processing_version);
 ALTER TABLE diaobject ADD CONSTRAINT fk_diaobject_procver
   FOREIGN KEY (processing_version) REFERENCES processing_version(id) ON DELETE RESTRICT;
-CREATE INDEX idx_diaobject_nearbyext1 ON diaobject(nearbyextobj1id);
+CREATE INDEX idx_diaobject_nearbyext1id ON diaobject(nearbyextobj1id);
+CREATE INDEX idx_diaobject_nearbyext1 ON diaobject(nearbyextobj1);
 ALTER TABLE diaobject ADD CONSTRAINT fk_diaobject_nearbyext1
   FOREIGN KEY (nearbyextobj1id) REFERENCES host_galaxy(id) ON DELETE SET NULL;
-CREATE INDEX idx_diaobject_nearbyext2 ON diaobject(nearbyextobj2id);
+CREATE INDEX idx_diaobject_nearbyext2id ON diaobject(nearbyextobj2id);
+CREATE INDEX idx_diaobject_nearbyext2 ON diaobject(nearbyextobj2);
 ALTER TABLE diaobject ADD CONSTRAINT fk_diaobject_nearbyext2
   FOREIGN KEY (nearbyextobj2id) REFERENCES host_galaxy(id) ON DELETE SET NULL;
-CREATE INDEX idx_diaobject_nearbyext3 ON diaobject(nearbyextobj3id);
+CREATE INDEX idx_diaobject_nearbyext3id ON diaobject(nearbyextobj3id);
+CREATE INDEX idx_diaobject_nearbyext3 ON diaobject(nearbyextobj3);
 ALTER TABLE diaobject ADD CONSTRAINT fk_diaobject_nearbyext3
   FOREIGN KEY (nearbyextobj3id) REFERENCES host_galaxy(id) ON DELETE SET NULL;
 
@@ -267,8 +283,9 @@ CREATE TABLE diasource(
   pixelflags integer,
 
   PRIMARY KEY (diasourceid, processing_version)
-)
-PARTITION BY LIST (processing_version);
+);
+-- )
+-- PARTITION BY LIST (processing_version);
 CREATE INDEX idx_diasource_id ON diasource(diasourceid);
 CREATE INDEX idx_diasource_q3c ON diasource (q3c_ang2ipix(ra, dec));
 CREATE INDEX idx_diasource_visit ON diasource(visit);
@@ -283,7 +300,7 @@ CREATE INDEX idx_diasource_procver ON diasource(processing_version);
 ALTER TABLE diasource ADD CONSTRAINT fk_diasource_procver
   FOREIGN KEY (processing_version) REFERENCES processing_version(id) ON DELETE RESTRICT;
 
-CREATE TABLE diasource_default PARTITION OF diasource DEFAULT;
+-- CREATE TABLE diasource_default PARTITION OF diasource DEFAULT;
 
 
 -- Selected from DiaForcedSource APDB table
@@ -309,8 +326,9 @@ CREATE TABLE diaforcedsource (
   time_withdrawn timestamp with time zone,
 
   PRIMARY KEY (diaforcedsourceid, processing_version)
-)
-PARTITION BY LIST (processing_version);
+);
+-- )
+-- PARTITION BY LIST (processing_version);
 CREATE INDEX idx_diaforcedsource_id ON diaforcedsource(diaforcedsourceid);
 CREATE INDEX idx_diaforcedsource_q3c ON diaforcedsource (q3c_ang2ipix(ra, dec));
 CREATE INDEX idx_diaforcedsource_visit ON diaforcedsource(visit);
@@ -325,7 +343,7 @@ CREATE INDEX idx_diaforcedsource_procver ON diaforcedsource(processing_version);
 ALTER TABLE diaforcedsource ADD CONSTRAINT fk_diaforcedsource_procver
   FOREIGN KEY (processing_version) REFERENCES processing_version(id) ON DELETE RESTRICT;
 
-CREATE TABLE diaforcedsource_default PARTITION OF diaforcedsource DEFAULT;
+-- CREATE TABLE diaforcedsource_default PARTITION OF diaforcedsource DEFAULT;
 
 
 CREATE TABLE diaobject_snapshot(
@@ -334,7 +352,7 @@ CREATE TABLE diaobject_snapshot(
   snapshot integer NOT NULL,
   PRIMARY KEY(diaobjectid, processing_version, snapshot)
 );
-CREATE INDEX ix_doss_diaobject ON diaobject_snapshot(diaobjectid,processing_Version);
+CREATE INDEX ix_doss_diaobject ON diaobject_snapshot(diaobjectid,processing_version);
 CREATE INDEX ix_doss_snapshot ON diaobject_snapshot(snapshot);
 ALTER TABLE diaobject_snapshot ADD CONSTRAINT fk_diaobject_snapshot_object
   FOREIGN KEY (diaobjectid,processing_version) REFERENCES diaobject(diaobjectid,processing_version)
@@ -348,8 +366,10 @@ CREATE TABLE diasource_snapshot(
   processing_version integer NOT NULL,
   snapshot integer NOT NULL,
   PRIMARY KEY( diasourceid, processing_version, snapshot)
-)
-PARTITION BY LIST (processing_version);
+);
+-- )
+-- PARTITION BY LIST (processing_version);
+CREATE INDEX ix_dsss_procver ON diasource_snapshot(processing_version);
 CREATE INDEX ix_dsss_diasource ON diasource_snapshot(diasourceid,processing_version);
 CREATE INDEX ix_dsss_snapshot ON diasource_snapshot(snapshot);
 ALTER TABLE diasource_snapshot ADD CONSTRAINT fk_diasource_snapshot_source
@@ -358,7 +378,7 @@ ALTER TABLE diasource_snapshot ADD CONSTRAINT fk_diasource_snapshot_source
 ALTER TABLE diasource_snapshot ADD CONSTRAINT fk_diasource_snapshot_snapshot
   FOREIGN KEY (snapshot) REFERENCES snapshot(id) ON DELETE CASCADE;
 
-CREATE TABLE diasource_snapshot_default PARTITION OF diasource_snapshot DEFAULT;
+-- CREATE TABLE diasource_snapshot_default PARTITION OF diasource_snapshot DEFAULT;
 
 
 CREATE TABLE diaforcedsource_snapshot(
@@ -366,8 +386,9 @@ CREATE TABLE diaforcedsource_snapshot(
   processing_version integer NOT NULL,
   snapshot integer NOT NULL,
   PRIMARY KEY( diaforcedsourceid, processing_version, snapshot)
-)
-PARTITION BY LIST (processing_version);
+);
+-- )
+-- PARTITION BY LIST (processing_version);
 CREATE INDEX ix_dfsss_diaforcedsource ON diaforcedsource_snapshot(diaforcedsourceid,processing_version);
 CREATE INDEX ix_dfsss_snapshot ON diaforcedsource_snapshot(snapshot);
 ALTER TABLE diaforcedsource_snapshot ADD CONSTRAINT fk_diaforcedsource_snapshot_forcedsource
@@ -376,7 +397,7 @@ ALTER TABLE diaforcedsource_snapshot ADD CONSTRAINT fk_diaforcedsource_snapshot_
 ALTER TABLE diaforcedsource_snapshot ADD CONSTRAINT fk_diaforcedsource_snapshot_snapshot
   FOREIGN KEY (snapshot) REFERENCES snapshot(id) ON DELETE CASCADE;
 
-CREATE TABLE diaforcedsource_snapshot_default PARTITION OF diaforcedsource_snapshot DEFAULT;
+-- CREATE TABLE diaforcedsource_snapshot_default PARTITION OF diaforcedsource_snapshot DEFAULT;
 
 
 CREATE TABLE query_queue(

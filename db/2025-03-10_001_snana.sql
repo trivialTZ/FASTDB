@@ -73,13 +73,16 @@ CREATE TABLE ppdb_diaobject(
   pmdec_parallax_cov real,
   pmra_pmdec_cov real
 );
-CREATE INDEX idx_ppdb_diaobject_nearbyext1 ON ppdb_diaobject(nearbyextobj1id);
+CREATE INDEX idx_ppdb_diaobject_nearbyext1id ON ppdb_diaobject(nearbyextobj1id);
+CREATE INDEX idx_ppdb_diaobject_nearbyext1 ON ppdb_diaobject(nearbyextobj1);
 ALTER TABLE ppdb_diaobject ADD CONSTRAINT fk_ppdb_diaobject_nearbyext1
   FOREIGN KEY (nearbyextobj1id) REFERENCES ppdb_host_galaxy(id) ON DELETE SET NULL;
-CREATE INDEX idx_ppdb_diaobject_nearbyext2 ON ppdb_diaobject(nearbyextobj2id);
+CREATE INDEX idx_ppdb_diaobject_nearbyext2id ON ppdb_diaobject(nearbyextobj2id);
+CREATE INDEX idx_ppdb_diaobject_nearbyext2 ON ppdb_diaobject(nearbyextobj2);
 ALTER TABLE ppdb_diaobject ADD CONSTRAINT fk_ppdb_diaobject_nearbyext2
   FOREIGN KEY (nearbyextobj2id) REFERENCES ppdb_host_galaxy(id) ON DELETE SET NULL;
-CREATE INDEX idx_ppdb_diaobject_nearbyext3 ON ppdb_diaobject(nearbyextobj3id);
+CREATE INDEX idx_ppdb_diaobject_nearbyext3id ON ppdb_diaobject(nearbyextobj3id);
+CREATE INDEX idx_ppdb_diaobject_nearbyext3 ON ppdb_diaobject(nearbyextobj3);
 ALTER TABLE ppdb_diaobject ADD CONSTRAINT fk_ppdb_diaobject_nearbyext3
   FOREIGN KEY (nearbyextobj3id) REFERENCES ppdb_host_galaxy(id) ON DELETE SET NULL;
 

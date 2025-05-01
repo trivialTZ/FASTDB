@@ -54,8 +54,8 @@ class SourceImporter:
             the same root_diaobject.
 
         """
-        self.processing_version = processing_version
-        self.object_match_radius = object_match_radius
+        self.processing_version = int( processing_version )
+        self.object_match_radius = float( object_match_radius )
 
 
     def _read_mongo_fields( self, pqconn, collection, pipeline, fields, temptable, liketable,

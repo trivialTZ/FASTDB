@@ -10,6 +10,7 @@ import multiprocessing
 from services.projectsim import AlertSender
 from services.brokerconsumer import BrokerConsumer
 from services.source_importer import SourceImporter
+from services.dr_importer import DRImporter
 from util import logger
 import db
 
@@ -188,6 +189,8 @@ def alerts_90days_sent_received_and_imported( barf, procver, alerts_60moredays_s
         with db.MG() as mongoclient:
             collection = db.get_mongo_collection( mongoclient, collection_name )
             nobj, nroot, nsrc, nfrc = si.import_from_mongo( collection )
+        dri = DRImporter( procver.id )
+        dri.import_host_info()
         yield nobj, nroot, nsrc, nfrc
     finally:
         with db.DB() as conn:
