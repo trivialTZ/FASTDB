@@ -7,6 +7,7 @@ import db
 import webserver.rkauth_flask as rkauth_flask
 import webserver.dbapp as dbapp
 import webserver.ltcvapp as ltcvapp
+import webserver.spectrumapp as spectrumapp
 from webserver.baseview import BaseView
 
 # ======================================================================
@@ -65,6 +66,8 @@ app.register_blueprint( rkauth_flask.bp )
 
 app.register_blueprint( dbapp.bp )
 app.register_blueprint( ltcvapp.bp )
+app.register_blueprint( spectrumapp.bp )
+
 
 urls = {
     "/": MainPage,

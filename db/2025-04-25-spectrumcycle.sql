@@ -26,7 +26,7 @@ ALTER TABLE spectruminfo ADD CONSTRAINT fk_spectruminfo_root_diaobject
 
   
 CREATE TABLE wantedspectra(
-  wantspec_id UUID NOT NULL PRIMARY KEY DEFAULT gen_random_uuid(),
+  wantspec_id text NOT NULL PRIMARY KEY,
   root_diaobject_id UUID NOT NULL,
   wanttime timestamp with time zone,
   user_id UUID NOT NULL,
@@ -51,7 +51,8 @@ CREATE TABLE plannedspectra(
   comment text
 );
 CREATE INDEX ix_plannedspectra_root_diaobject_id ON plannedspectra(root_diaobject_id);
-CREATE INDEX ix_plantime ON plannedspectra(plantime);
+CREATE INDEX ix_plannedspectra_created_at ON plannedspectra(created_at);
+CREATE INDEX ix_plannedspectra_plantime ON plannedspectra(plantime);
 ALTER TABLE plannedspectra ADD CONSTRAINT fk_plannedspectra_root_diaobject
   FOREIGN KEY (root_diaobject_id) REFERENCES root_diaobject(id) ON DELETE RESTRICT;
 

@@ -302,7 +302,7 @@ tyOci9saPPfI1bNnKD202zsCAwEAAQ==
     user.delete_from_db()
 
 
-@pytest.fixture
+@pytest.fixture( scope='session' )
 def fastdb_client( test_user ):
     return FASTDBClient( 'http://webap:8080', username="test", password="test_password", verify=False, debug=True )
 
