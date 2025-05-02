@@ -6,6 +6,7 @@ AC_CONFIG_FILES([
   src/webserver/Makefile
   src/config.py
   share/Makefile
+  client/Makefile
 ])
 
 AC_ARG_WITH( installdir,

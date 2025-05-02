@@ -17,6 +17,8 @@ from db import ( ProcessingVersion,
                  DB,
                  AuthUser )
 from util import asUUID, logger
+from fastdb.fastdb_client import FASTDBClient
+
 
 sys.path.insert( 0, pathlib.Path(__file__).parent )
 # For cleanliness, a bunch of fixtures are broken
@@ -298,6 +300,11 @@ tyOci9saPPfI1bNnKD202zsCAwEAAQ==
     yield user
 
     user.delete_from_db()
+
+
+@pytest.fixture
+def fastdb_client( test_user ):
+    return FASTDBClient( 'http://webap:8080', username="test", password="test_password", verify=False, debug=True )
 
 
 @pytest.fixture( scope='session' )

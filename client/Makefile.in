@@ -86,7 +86,7 @@ POST_INSTALL = :
 NORMAL_UNINSTALL = :
 PRE_UNINSTALL = :
 POST_UNINSTALL = :
-subdir = share
+subdir = client
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
@@ -141,8 +141,8 @@ am__uninstall_files_from_dir = { \
     || { echo " ( cd '$$dir' && rm -f" $$files ")"; \
          $(am__cd) "$$dir" && rm -f $$files; }; \
   }
-am__installdirs = "$(DESTDIR)$(avscdir)"
-DATA = $(avsc_DATA)
+am__installdirs = "$(DESTDIR)$(clientdir)"
+DATA = $(client_DATA)
 am__tagged_files = $(HEADERS) $(SOURCES) $(TAGS_FILES) $(LISP)
 am__DIST_COMMON = $(srcdir)/Makefile.in
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
@@ -237,14 +237,8 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 AUTOMAKE_OPTION = subdir-objects
-sharedir = @installdir@/share
-avscdir = @installdir@/share/avsc
-avsc_DATA = avsc/fastdb_test_0.1.Alert.avsc \
-	avsc/fastdb_test_0.1.DiaForcedSource.avsc \
-	avsc/fastdb_test_0.1.DiaObject.avsc \
-	avsc/fastdb_test_0.1.DiaSource.avsc \
-	avsc/fastdb_test_0.1.BrokerMessage.avsc
-
+clientdir = @installdir@/fastdb
+client_DATA = __init__.py fastdb_client.py
 all: all-am
 
 .SUFFIXES:
@@ -257,9 +251,9 @@ $(srcdir)/Makefile.in:  $(srcdir)/Makefile.am  $(am__configure_deps)
 	      exit 1;; \
 	  esac; \
 	done; \
-	echo ' cd $(top_srcdir) && $(AUTOMAKE) --foreign share/Makefile'; \
+	echo ' cd $(top_srcdir) && $(AUTOMAKE) --foreign client/Makefile'; \
 	$(am__cd) $(top_srcdir) && \
-	  $(AUTOMAKE) --foreign share/Makefile
+	  $(AUTOMAKE) --foreign client/Makefile
 Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 	@case '$?' in \
 	  *config.status*) \
@@ -277,27 +271,27 @@ $(top_srcdir)/configure:  $(am__configure_deps)
 $(ACLOCAL_M4):  $(am__aclocal_m4_deps)
 	cd $(top_builddir) && $(MAKE) $(AM_MAKEFLAGS) am--refresh
 $(am__aclocal_m4_deps):
-install-avscDATA: $(avsc_DATA)
+install-clientDATA: $(client_DATA)
 	@$(NORMAL_INSTALL)
-	@list='$(avsc_DATA)'; test -n "$(avscdir)" || list=; \
+	@list='$(client_DATA)'; test -n "$(clientdir)" || list=; \
 	if test -n "$$list"; then \
-	  echo " $(MKDIR_P) '$(DESTDIR)$(avscdir)'"; \
-	  $(MKDIR_P) "$(DESTDIR)$(avscdir)" || exit 1; \
+	  echo " $(MKDIR_P) '$(DESTDIR)$(clientdir)'"; \
+	  $(MKDIR_P) "$(DESTDIR)$(clientdir)" || exit 1; \
 	fi; \
 	for p in $$list; do \
 	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
 	  echo "$$d$$p"; \
 	done | $(am__base_list) | \
 	while read files; do \
-	  echo " $(INSTALL_DATA) $$files '$(DESTDIR)$(avscdir)'"; \
-	  $(INSTALL_DATA) $$files "$(DESTDIR)$(avscdir)" || exit $$?; \
+	  echo " $(INSTALL_DATA) $$files '$(DESTDIR)$(clientdir)'"; \
+	  $(INSTALL_DATA) $$files "$(DESTDIR)$(clientdir)" || exit $$?; \
 	done
 
-uninstall-avscDATA:
+uninstall-clientDATA:
 	@$(NORMAL_UNINSTALL)
-	@list='$(avsc_DATA)'; test -n "$(avscdir)" || list=; \
+	@list='$(client_DATA)'; test -n "$(clientdir)" || list=; \
 	files=`for p in $$list; do echo $$p; done | sed -e 's|^.*/||'`; \
-	dir='$(DESTDIR)$(avscdir)'; $(am__uninstall_files_from_dir)
+	dir='$(DESTDIR)$(clientdir)'; $(am__uninstall_files_from_dir)
 tags TAGS:
 
 ctags CTAGS:
@@ -341,7 +335,7 @@ check-am: all-am
 check: check-am
 all-am: Makefile $(DATA)
 installdirs:
-	for dir in "$(DESTDIR)$(avscdir)"; do \
+	for dir in "$(DESTDIR)$(clientdir)"; do \
 	  test -z "$$dir" || $(MKDIR_P) "$$dir"; \
 	done
 install: install-am
@@ -394,7 +388,7 @@ info: info-am
 
 info-am:
 
-install-data-am: install-avscDATA
+install-data-am: install-clientDATA
 
 install-dvi: install-dvi-am
 
@@ -438,13 +432,13 @@ ps: ps-am
 
 ps-am:
 
-uninstall-am: uninstall-avscDATA
+uninstall-am: uninstall-clientDATA
 
 .MAKE: install-am install-strip
 
 .PHONY: all all-am check check-am clean clean-generic cscopelist-am \
 	ctags-am distclean distclean-generic distdir dvi dvi-am html \
-	html-am info info-am install install-am install-avscDATA \
+	html-am info info-am install install-am install-clientDATA \
 	install-data install-data-am install-dvi install-dvi-am \
 	install-exec install-exec-am install-html install-html-am \
 	install-info install-info-am install-man install-pdf \
@@ -452,7 +446,7 @@ uninstall-am: uninstall-avscDATA
 	installcheck installcheck-am installdirs maintainer-clean \
 	maintainer-clean-generic mostlyclean mostlyclean-generic pdf \
 	pdf-am ps ps-am tags-am uninstall uninstall-am \
-	uninstall-avscDATA
+	uninstall-clientDATA
 
 .PRECIOUS: Makefile
 

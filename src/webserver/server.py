@@ -6,7 +6,7 @@ import flask_session
 import db
 import webserver.rkauth_flask as rkauth_flask
 import webserver.dbapp as dbapp
-import webserver.ltcv as ltcvapp
+import webserver.ltcvapp as ltcvapp
 from webserver.baseview import BaseView
 
 # ======================================================================
@@ -64,7 +64,7 @@ rkauth_flask.RKAuthConfig.setdbparams(
 app.register_blueprint( rkauth_flask.bp )
 
 app.register_blueprint( dbapp.bp )
-app.register_buleprint( ltcvapp.bp )
+app.register_blueprint( ltcvapp.bp )
 
 urls = {
     "/": MainPage,

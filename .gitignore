@@ -10,6 +10,7 @@
 /src/config.py
 /src/webserver/Makefile
 /share/Makefile
+/client/Makefile
 
 # Test install location
 install/

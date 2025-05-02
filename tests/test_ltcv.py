@@ -3,6 +3,12 @@ import ltcv
 
 # The fixture takes a while (30-60 seconds) to run.  Note that it's a module-scope fixture!
 def test_get_hot_ltcvs( procver, alerts_90days_sent_received_and_imported ):
+    nobj, nroot, nsrc, nfrc = alerts_90days_sent_received_and_imported
+    assert nobj == 37
+    assert nroot == 37
+    assert nsrc == 181
+    assert nfrc == 855
+
     df, hostdf = ltcv.get_hot_ltcvs( procver.description, detected_since_mjd=60325., mjd_now=60328. )
 
     # Should have found 88 lightcurve points on 4 objects
