@@ -68,6 +68,8 @@ TODO document this.  In the mean time, see the `examples FASDTB client Juypyter 
 Lightcurve Endpoints
 --------------------
 
+.. _ltcv-gethottransients:
+
 ``ltcv/gethottransients``
 *************************
 
@@ -82,8 +84,33 @@ Spectrum Endpoints
 
 TODO
 
+
 ``spectrum/spectrawanted``
 **************************
 
-TODO
+This is the endpoint to query if you want to figure out which specific objects have had spectra requested.  You would use this if you've got access to a spectroscopic instrument, and you want to know what spectra are most useful to DESC.  This will *only* find spectra where somebody has requested it using ``spectrum/askforspectrum``; if what you're after is any active transient, then you want to use :ref:`ltcv/gethottransients <ltcv-gethottansients>` instead.
+
+POST to the endpoint with dictionary in a JSON payload.  This may be an empty dictionary ``{}``; the following optional keys may be included:
+
+* ``requested_since`` : string in the format ``YYYY-MM-DD`` or ``YYYY-MM-DD hh:mm:ss``; only find spectra that were requested since this time.  (This is so you can filter out old requests.)  You will usually want to specify this.  If you don't, it will give you anything that anybody has asked for ever.
+
+* ``requester`` : string; if given, only get spectra requested by a specific requester.  If not given, get all spectra requested by everybody.
+  
+* ``not_claimed_in_last_days`` : int; only return spectra where nobody else has indicated a intention to take this spectrum.  Use this to coordinate between facilities, so that multiple facilities don't all get the same spectra.  This defaults to 7 if not specified.  If you don't want to consider whether anybody else has said they're going to take a spectrum, explicitly pass ``None`` for this value.
+
+* ``no_spectra_in_last_days``: int; only return objects that have not had spectrum information reported in this many days.  This is also for coordination.  If you don't want to consider just what is planned, but what somebody actually claims to have observed, then use this.  If not given, it defaults to 7.  (This may be combined with ``not_claimed_in_last_days``.  It's entirely possible that people will report spectra that they have not claimed.)  To disable consideration of existing spectra, as with ``not_claimed_in_last_days`` set this parameter to ``None``.
+  
+* ``procver`` : string; the processing version to look at when finding photometry.  It will also filter out objects which are not defined in this procesing version.  If not given, will consider all data from all processing versions.  This is probably actually OK, because we're unlikely to have multiple processing versions of real-time data from the last couple of weeks.  However, to be safe, you might want to use [ROB FIGURE OUT THE PROCESSING VERSION ALIAS WE'RE GOING TO USE FOR REAL TIME DATA].
+
+* ``detected_since_mjd`` : float.  Only return objects that have been *detected* (i.e. found as a source in DIA scanning) by Rubin since this MJD.  Be aware that an object may not have been detected in the last few days simply because it's field hasn't been observed!  If not passed, then the server will use ``detected_in_last_days`` (below) instead.  Pass ``None`` to explicilty disable consideration of recent detections.
+
+* ``detected_in_last_days``: float.  Only return objects that have been *detected* within this may previous days by LSST DIA.  Ignored if ``detected_since_mjd`` is specified.  If neither this nor ``detected_since_mjd`` is given, defaults to 14.
+
+* ``lim_mag`` : float; a limiting magnitude; make sure that the last measurement or detection was at most this magnitude.
+
+* ``lim_mag_band`` : str; one of u, g, r, i, z, or Y.  The band of ``lim_mag``.  If not given, will just look at the latest observation without regard to band.
+  
+* ``mjd_now`` : float; pretend that the current MJD is this date.  Normally, the server will use the current time, and normally this is what you want.  This parameter is here for testing purposes.  All database queries will cut off things that are later in time than this time.
+  
+You will get back a ROB DOCUMENT THIS.
 
