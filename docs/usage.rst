@@ -145,4 +145,20 @@ these must match exactly what you passed when you called ``spectrum/planspectrum
 
 If all is well, you will get back a dictionary with a two keys.  The value of ``status`` will be ``ok``, and the value of ``ndel`` will be the number of rows deleted from the database.
 
+``spectrum/reportspectruminfo``
+*******************************
 
+When you've actually taken a spectrum, it will help us greatly if you tell us about it. This both lets us know that a spectrum has been taken, and gives us information about type and redshift. Eventually, we may have additional fields (something about S/N, something about type confidence, perhaps), and eventually we will have a way for uploading a 1d spectrum, but for now we're just asking for a redshift and a classid.
+
+POST to the api endpoint with a JSON payload that is a dict, with keys:
+
+* ``oid``: string UUID;  the id of the object, the same value that all the previous URLs have used
+
+* ``facility``: string; the name of the facility. If you submitted a plan, this should match the facililty that you sent to ``spectrum/planspectrum``. (It's OK to report spectra that you didn't declare a plan for ahead of time!)
+
+* ``mjd``: float; the mjd of when the spectrum was taken. (Beginning, middle, or end of exposure, doesn't matter.)
+
+* ``z``: float;  the redshift of the supernova from the spectrum. Leave this blank ("" or None) if it cannot be determined.
+
+* ``classid``: int — the type from the spectrum. Use the `ELAsTiCC/DESC taxonomy <https://github.com/LSSTDESC/elasticc/blob/main/taxonomy/taxonomy.ipynb>`_.
+  

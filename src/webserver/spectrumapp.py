@@ -126,34 +126,29 @@ class WhatSpectraAreWanted( BaseView ):
 
 class PlanSpectrum( BaseView ):
     def do_the_things( self ):
+        data = flask.request.json
+
+        if not all( i in data for i in ['oid', 'facility', 'plantime'] ):
+            return "JSON payload must include keys oid, facility, plantime", 500
+
         try:
-            data = flask.request.json
+            plantime = datetime.datetime.fromisoformat( data['plantime'] )
+            if plantime.tzinfo is None:
+                plantime = pytz.utc.localize( plantime )
+            else:
+                plantime = plantime.astimezone( datetime.UTC )
+        except (TypeError, ValueError):
+            return f"Failed to parse YYYY-MM-DD HH:MM:SS from {data['plantime']}", 500
 
-            if not all( i in data for i in ['oid', 'facility', 'plantime'] ):
-                return "JSON payload must include keys oid, facility, plantime", 500
+        kwargs = { 'root_diaobject_id': uuid.UUID( data['oid'] ),
+                   'facility': str( data['facility'] ),
+                   'plantime': plantime,
+                   'comment': data['comment'] if 'comment' in data else None
+                  }
+        plansp = db.PlannedSpectra( **kwargs )
+        plansp.insert( refresh=False )
 
-            try:
-                plantime = datetime.datetime.fromisoformat( data['plantime'] )
-                if plantime.tzinfo is None:
-                    plantime = pytz.utc.localize( plantime )
-                else:
-                    plantime = plantime.astimezone( datetime.UTC )
-            except (TypeError, ValueError):
-                return f"Failed to parse YYYY-MM-DD HH:MM:SS from {data['plantime']}", 500
-
-            kwargs = { 'root_diaobject_id': uuid.UUID( data['oid'] ),
-                       'facility': str( data['facility'] ),
-                       'plantime': plantime,
-                       'comment': data['comment'] if 'comment' in data else None
-                      }
-            plansp = db.PlannedSpectra( **kwargs )
-            plansp.insert( refresh=False )
-
-            return { "status": "ok" }
-
-        except Exception as e:
-            flask.current_app.logger.exception( "Exception in PlanSpectrum" )
-            return f"Exception in PlanSpectrum: {str(e)}", 500
+        return { "status": "ok" }
 
 
 # ======================================================================
@@ -161,26 +156,44 @@ class PlanSpectrum( BaseView ):
 
 class RemoveSpectrumPlan( BaseView ):
     def do_the_things( self ):
-        try:
-            data = flask.request.json
+        data = flask.request.json
 
-            if ( 'oid' not in data ) or ( 'facility' not in data ):
-                return "JSON payload must include keys oid and facility", 500
+        if ( 'oid' not in data ) or ( 'facility' not in data ):
+            return "JSON payload must include keys oid and facility", 500
 
-            with db.DB() as con:
-                cursor = con.cursor()
-                cursor.execute( "DELETE FROM plannedspectra WHERE root_diaobject_id=%(id)s "
-                                "  AND facility=%(fac)s",
-                                { 'id': data['oid'],
-                                  'fac': data['facility'] } )
-                nrows = cursor.rowcount
-                con.commit()
+        with db.DB() as con:
+            cursor = con.cursor()
+            cursor.execute( "DELETE FROM plannedspectra WHERE root_diaobject_id=%(id)s "
+                            "  AND facility=%(fac)s",
+                            { 'id': data['oid'],
+                              'fac': data['facility'] } )
+            nrows = cursor.rowcount
+            con.commit()
 
-            return { 'status': 'ok', 'ndel': nrows }
+        return { 'status': 'ok', 'ndel': nrows }
 
-        except Exception as e:
-            flask.current_app.logger.exception( "Exception in RemoveSpectrumPlan" )
-            return f"Exception in RemoveSpectrumPlan: {str(e)}", 500
+
+# ======================================================================
+# /spectrum/reportspectruminfo
+
+class ReportSpectrumInfo( BaseView ):
+    def do_the_things( self ):
+        data = flask.request.json
+
+        if not all( i in data for i in [ 'oid', 'facility', 'mjd', 'z', 'classid' ] ):
+            return "JSON payload must include keys oid, facility, mjd, z, and classid", 500
+
+        specinfo = db.SpectrumInfo( root_diaobject_id=uuid.UUID( data['oid'] ),
+                                    facility=str( data['facility'] ),
+                                    inserted_at=datetime.datetime.now( tz=datetime.UTC ),
+                                    mjd=float( data['mjd'] ),
+                                    z=( None if ( ( 'z' not in data ) or ( data['z'] is None ) or
+                                                  ( str(data['z']).strip()=="" ) )
+                                        else float( data['z'] ) ),
+                                    classid=int( data['classid'] ) )
+        specinfo.insert( refresh=False )
+
+        return { 'status': 'ok' }
 
 
 # **********************************************************************
@@ -194,6 +207,7 @@ urls = {
     "/spectrawanted": WhatSpectraAreWanted,
     "/planspectrum": PlanSpectrum,
     "/removespectrumplan": RemoveSpectrumPlan,
+    "/reportspectruminfo": ReportSpectrumInfo,
 }
 
 usedurls = {}

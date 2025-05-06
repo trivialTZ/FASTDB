@@ -384,3 +384,29 @@ def test_remove_spectrum_plan( setup_wanted_spectra_etc, fastdb_client ):
     assert set( str(r['root_diaobject_id']) for r in rows ) == { str(idmap[i]) for i in ( 1747042, 1696949, 191776 ) }
     assert [ r['facility'] for r in rows if r['root_diaobject_id'] == idmap[1747042] ] == [ 'Second test facility' ]
     assert set( r['facility'] for r in rows ) == { 'test facility', 'Second test facility' }
+
+
+def test_report_spectrum_info( setup_wanted_spectra_etc, fastdb_client ):
+    _mjdnow, _now, idmap = setup_wanted_spectra_etc
+
+    res = fastdb_client.post( '/spectrum/reportspectruminfo',
+                              json={ 'oid': str( idmap[1747042] ),
+                                     'facility': "Rob's C8 in his back yard",
+                                     'mjd': 60364.128,
+                                     'z': 1.36,
+                                     'classid': 2232 } )
+    assert res['status'] == 'ok'
+
+    with db.DB() as con:
+        cursor = con.cursor( row_factory=psycopg.rows.dict_row )
+        cursor.execute( "SELECT * FROM spectruminfo" )
+        rows = cursor.fetchall()
+
+    # There was one pre-existing one from the fixture
+    assert len(rows) == 2
+    r = [ row for row in rows if row['root_diaobject_id']==idmap[1747042] ][0]
+    assert r['facility'] == "Rob's C8 in his back yard"
+    # Note that the mjd column in the spectruminfo table is only a real, so only has 24 bits of precision
+    assert r['mjd'] == pytest.approx( 60364.13, abs=0.01 )
+    assert r['z'] == pytest.approx( 1.36, abs=0.01 )
+    assert r['classid'] == 2232
