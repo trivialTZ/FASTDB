@@ -162,3 +162,44 @@ POST to the api endpoint with a JSON payload that is a dict, with keys:
 
 * ``classid``: int — the type from the spectrum. Use the `ELAsTiCC/DESC taxonomy <https://github.com/LSSTDESC/elasticc/blob/main/taxonomy/taxonomy.ipynb>`_.
   
+
+``spectrum/getknownspectruminfo``
+**********************************
+
+This is to get what spectrum information has been reported.
+
+POST to the api endpoint a JSON-encoded dict.  All keys are optional; possibilities include:
+
+* ``oid`` :  str or list of str; if included only get the spectra for this object or these objects.  (Query multiple objects by passing a list.)  These are the same UUIDs that all the previous endpoints have used.
+
+``facility``: str; if included, only get spectrum information from this facility.  Otherwise, include spectrum information from all facilities.
+
+``mjd_min``: float; if included, only get information about spectra taken at this mjd or later.
+
+``mjd_max``: float; if included, only get information about spectra taken at this mjd or earlier.
+
+``classid``: float; if included, only get information about spectra tagged with this cass id.
+
+``z_min``: float; if included, only get information about spectra at this redshift or higher.
+
+``z_max``: float, if included, only get information about spectra at this redshift or lower.
+
+``since``: str ``YYYY-MM-DD HH:MM:SS`` or ``YYYY-MM-DD``; if included, only get spectra that were reported on this data/time (UTC) or later.
+
+If you include no keys, you'll get information about all spectra that the database knows about, which may be overwhelming. (The API may also time out.)
+
+If all is well, the response you get back is a json-encoded list (which might be empty).  Each element of the list is a dictionary with keys:
+
+* ``specinfo_id``: string UUID; you can safely ignore this
+
+* ``oid``: string UUID; the same UUID you've been using all along
+
+* ``facility``: string; the facility that reported the spectrumn
+
+* ``inserted_at``: datatime; the time at which the spectrum was reported to the database
+  
+* ``mjd``: float, the MJD the spectrum was taken
+
+* ``z``: float or None, the redshift from the spectrum.  If None, it means that the redshfit wasn't able to be determined from the spectrum.
+
+* ``classid``: the reported class id.

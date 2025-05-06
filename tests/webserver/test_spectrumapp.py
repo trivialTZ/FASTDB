@@ -155,6 +155,54 @@ def setup_wanted_spectra_etc( procver, alerts_90days_sent_received_and_imported,
             con.commit()
 
 
+@pytest.fixture
+def setup_spectrum_info( setup_wanted_spectra_etc ):
+    mjdnow, now, idmap = setup_wanted_spectra_etc
+
+    # The previous fixture adds one.  Let's add more.
+
+    with db.DB() as con:
+        cursor = con.cursor()
+
+        cursor.execute( "INSERT INTO spectruminfo(specinfo_id,root_diaobject_id,facility,inserted_at,"
+                        "                         mjd,z,classid) "
+                        "VALUES (%(sid)s,%(rid)s,%(fac)s,%(t)s,%(mjd)s,%(z)s,%(class)s)",
+                        { 'sid': uuid.uuid4(),
+                          'rid': idmap[1173200],
+                          'fac': 'test facility',
+                          't': now - datetime.timedelta( days=25 ),
+                          'mjd': mjdnow - 24,
+                          'z': 0.12,
+                          'class': 2235 } )
+
+        cursor.execute( "INSERT INTO spectruminfo(specinfo_id,root_diaobject_id,facility,inserted_at,"
+                        "                         mjd,z,classid) "
+                        "VALUES (%(sid)s,%(rid)s,%(fac)s,%(t)s,%(mjd)s,%(z)s,%(class)s)",
+                        { 'sid': uuid.uuid4(),
+                          'rid': idmap[1173200],
+                          'fac': "Galileo's Telescope",
+                          't': now - datetime.timedelta( days=2 ),
+                          'mjd': mjdnow - 3,
+                          'z': 0.005,
+                          'class': 2322 } )
+
+        cursor.execute( "INSERT INTO spectruminfo(specinfo_id,root_diaobject_id,facility,inserted_at,"
+                        "                         mjd,z,classid) "
+                        "VALUES (%(sid)s,%(rid)s,%(fac)s,%(t)s,%(mjd)s,%(z)s,%(class)s)",
+                        { 'sid': uuid.uuid4(),
+                          'rid': idmap[191776],
+                          'fac': "Rob's C8 in his back yard",
+                          't': now - datetime.timedelta( days=10 ),
+                          'mjd': mjdnow - 14,
+                          'z': 1.25,
+                          'class': 2342 } )
+
+        con.commit()
+
+    return mjdnow, now, idmap
+    # Don't have to clean up, parent fixture will do that
+
+
 
 def test_ask_for_spectra( procver, alerts_90days_sent_received_and_imported, fastdb_client ):
     try:
@@ -410,3 +458,106 @@ def test_report_spectrum_info( setup_wanted_spectra_etc, fastdb_client ):
     assert r['mjd'] == pytest.approx( 60364.13, abs=0.01 )
     assert r['z'] == pytest.approx( 1.36, abs=0.01 )
     assert r['classid'] == 2232
+
+
+def test_get_known_spectrum_info( setup_spectrum_info, fastdb_client):
+    mjdnow, now, idmap = setup_spectrum_info
+
+    # Get them all
+    res = fastdb_client.post( "/spectrum/getknownspectruminfo", json={} )
+    assert isinstance( res, list )
+    assert len(res) == 4
+    assert set( r['oid'] for r in res ) == set( str(idmap[i]) for i in ( 191776, 1173200 ) )
+    for r in res:
+        if r['oid'] == str( idmap[191776] ):
+            assert r['classid'] == 2342 if r['facility'] == "Rob's C8 in his back yard" else 2222
+        else:
+            assert r['classid'] == 2322 if r['facility'] == "Galileo's Telescope" else 2235
+
+    # Get only the ones from test facility
+    res = fastdb_client.post( "/spectrum/getknownspectruminfo", json={ 'facility': 'test facility' } )
+    assert len(res) == 2
+    assert set( r['oid'] for r in res ) == set( str(idmap[i]) for i in ( 191776, 1173200 ) )
+    assert set( r['classid'] for r in res ) == { 2222, 2235 }
+
+    # Test filtering by oid
+    res = fastdb_client.post( "/spectrum/getknownspectruminfo", json={ 'oid': str(idmap[191776]) } )
+    assert all( r['oid'] == str(idmap[191776]) for r in res )
+    assert set( r['facility'] for r in res ) == { "test facility", "Rob's C8 in his back yard" }
+
+    res = fastdb_client.post( "/spectrum/getknownspectruminfo",
+                              json={ 'oid': [ str(idmap[191776]), 'e7cb3c55-6679-4e4f-8e36-d2c6eab8faa1' ] } )
+    assert all( r['oid'] == str(idmap[191776]) for r in res )
+    assert set( r['facility'] for r in res ) == { "test facility", "Rob's C8 in his back yard" }
+
+    res = fastdb_client.post( "/spectrum/getknownspectruminfo", json={ 'oid': [ str(idmap[191776]),
+                                                                                str(idmap[1173200]) ] } )
+    assert len(res) == 4
+    assert set( r['oid'] for r in res ) == set( str(idmap[i]) for i in ( 191776, 1173200 ) )
+    for r in res:
+        if r['oid'] == str( idmap[191776] ):
+            assert r['classid'] == 2342 if r['facility'] == "Rob's C8 in his back yard" else 2222
+        else:
+            assert r['classid'] == 2322 if r['facility'] == "Galileo's Telescope" else 2235
+
+    # Test filtering by mjd
+    res = fastdb_client.post( "/spectrum/getknownspectruminfo", json={ 'mjd_min': mjdnow-5 } )
+    assert len(res) ==2
+    assert set( r['oid'] for r in res ) == set( str(idmap[i]) for i in ( 191776, 1173200 ) )
+    assert set( r['facility'] for r in res ) == {  "test facility", "Galileo's Telescope" }
+    assert set( r['z'] for r in res ) == { 0.005, 0.25 }
+
+    res = fastdb_client.post( "/spectrum/getknownspectruminfo", json={ 'mjd_max': mjdnow-5 } )
+    assert len(res) ==2
+    assert set( r['oid'] for r in res ) == set( str(idmap[i]) for i in ( 191776, 1173200 ) )
+    assert set( r['facility'] for r in res ) == {  "test facility", "Rob's C8 in his back yard" }
+    assert set( r['z'] for r in res ) == { 0.12, 1.25 }
+
+
+    res = fastdb_client.post( "/spectrum/getknownspectruminfo", json={ 'mjd_min': mjdnow-15,
+                                                                       'mjd_max': mjdnow-5 } )
+    assert len(res) == 1
+    assert res[0]['oid'] == str( idmap[191776] )
+    assert res[0]['facility'] == "Rob's C8 in his back yard"
+    assert res[0]['classid'] == 2342
+    assert res[0]['z'] == 1.25
+
+    # Test filtering by classid
+
+    res = fastdb_client.post( "/spectrum/getknownspectruminfo", json={ 'classid': 2342 } )
+    assert len(res) == 1
+    assert res[0]['oid'] == str( idmap[191776] )
+    assert res[0]['facility'] == "Rob's C8 in his back yard"
+    assert res[0]['classid'] == 2342
+    assert res[0]['z'] == 1.25
+
+    res = fastdb_client.post( "/spectrum/getknownspectruminfo", json={ 'classid': 42 } )
+    res == []
+
+    # Test filtering by z
+    res = fastdb_client.post( "/spectrum/getknownspectruminfo", json={ 'z_min': 0.2 } )
+    assert len(res) == 2
+    assert all( r['oid'] == str(idmap[191776]) for r in res )
+    assert set( r['facility'] for r in res ) == { 'test facility', "Rob's C8 in his back yard" }
+
+    res = fastdb_client.post( "/spectrum/getknownspectruminfo", json={ 'z_max': 0.01 } )
+    assert len(res) == 1
+    assert res[0]['oid'] == str( idmap[1173200] )
+    assert res[0]['facility'] == "Galileo's Telescope"
+    assert res[0]['z'] == 0.005
+    assert res[0]['classid'] == 2322
+
+    res = fastdb_client.post( "/spectrum/getknownspectruminfo", json={ 'z_min': 0.1, 'z_max': 0.2 } )
+    assert len(res) == 1
+    assert res[0]['oid'] == str( idmap[1173200] )
+    assert res[0]['facility'] == "test facility"
+    assert res[0]['z'] == 0.12
+    assert res[0]['classid'] == 2235
+
+    # Test filtering by since
+    res = fastdb_client.post( "/spectrum/getknownspectruminfo",
+                              json={ 'since': ( now - datetime.timedelta(days=5) ).isoformat() } )
+    assert len(res) == 2
+    assert set( r['oid'] for r in res ) == set( str(idmap[i]) for i in ( 191776, 1173200 ) )
+    assert set( r['facility'] for r in res ) == { "test facility", "Galileo's Telescope" }
+    assert set( r['classid'] for r in res ) == { 2222, 2322 }

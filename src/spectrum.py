@@ -3,6 +3,7 @@ import io
 import datetime
 import pytz
 import logging
+import collections
 
 import psycopg
 import pandas
@@ -384,3 +385,76 @@ def what_spectra_are_wanted( procver=None, wantsince=None, requester=None, notcl
                          'latest_forced_mag': row.frced_mag } )
 
     return { 'status': 'ok', 'wantedspectra': retarr }
+
+
+def get_spectrum_info( rootids=None, facility=None, mjd_min=None, mjd_max=None, classid=None,
+                       z_min=None, z_max=None, since=None, logger=None ):
+    if logger is None:
+        logger = logging.getLogger( __name__ )
+        logger.propagate = False
+        if not logger.hasHandlers():
+            logout = logging.StreamHandler( sys.stderr )
+            logger.addHandler( logout )
+            formatter = logging.Formatter( '[%(asctime)s - what_spectra_are_wanted - %(levelname)s] - %(message)s',
+                                           datefmt='%Y-%m-%d %H:%M:%S' )
+            logout.setFormatter( formatter )
+            logger.setLevel( logging.INFO )
+
+    with db.DB() as con:
+        cursor = con.cursor()
+        where = "WHERE"
+        q = "SELECT * FROM spectruminfo "
+        subdict = {}
+
+        if rootids is not None:
+            if ( isinstance( rootids, collections.abc.Sequence ) and not ( isinstance( rootids, str ) ) ):
+                q += f"{where} root_diaobject_id=ANY(%(ids)s) "
+                subdict['ids'] = [ str(i) for i in rootids ]
+            else:
+                q += f"{where} root_diaobject_id=%(id)s "
+                subdict['id'] = str(rootids)
+            where = "AND"
+
+        if facility is not None:
+            q += f"{where} facility=%(fac)s "
+            subdict['fac'] = facility
+            where = "AND"
+
+        if mjd_min is not None:
+            q += f"{where} mjd>=%(mjdmin)s "
+            subdict['mjdmin'] = mjd_min
+            where = "AND"
+
+        if mjd_max is not None:
+            q += f"{where} mjd<=%(mjdmax)s "
+            subdict['mjdmax'] = mjd_max
+            where = "AND"
+
+        if classid is not None:
+            q += f"{where} classid=%(class)s "
+            subdict['class'] = classid
+            where = "AND"
+
+        if z_min is not None:
+            q += f"{where} z>=%(zmin)s "
+            subdict['zmin'] = z_min
+            where = "AND"
+
+        if z_max is not None:
+            q += f"{where} z<=%(zmax)s "
+            subdict['zmax'] = z_max
+            where = "AND"
+
+        if since is not None:
+            q += f"{where} inserted_at>=%(since)s "
+            subdict['since'] = since
+            where = "AND"
+
+        tmpcur = psycopg.ClientCursor( con )
+        logger.debug( f"Sending query: {tmpcur.mogrify(q,subdict)}" )
+
+        cursor.execute( q, subdict )
+        columns = [ col.name for col in cursor.description ]
+        df = pandas.DataFrame( cursor.fetchall(), columns=columns )
+
+    return df

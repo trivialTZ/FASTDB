@@ -196,6 +196,23 @@ class ReportSpectrumInfo( BaseView ):
         return { 'status': 'ok' }
 
 
+# ======================================================================
+# /spectrum/getknownspectruminfo
+
+class GetSpectrumInfo( BaseView ):
+    def do_the_things( self ):
+        data = flask.request.json.copy()
+
+        if 'oid' in data:
+            data['rootids'] = data['oid']
+            del data['oid']
+
+        df = spectrum.get_spectrum_info( logger=flask.current_app.logger, **data )
+        df.rename( columns={ 'root_diaobject_id': 'oid' }, inplace=True )
+        df['inserted_at'] = df['inserted_at'].apply( lambda x: x.isoformat() )
+        return df.to_dict( 'records' )
+
+
 # **********************************************************************
 # **********************************************************************
 # **********************************************************************
@@ -208,6 +225,7 @@ urls = {
     "/planspectrum": PlanSpectrum,
     "/removespectrumplan": RemoveSpectrumPlan,
     "/reportspectruminfo": ReportSpectrumInfo,
+    "/getknownspectruminfo": GetSpectrumInfo,
 }
 
 usedurls = {}
