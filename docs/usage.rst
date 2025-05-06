@@ -114,3 +114,18 @@ POST to the endpoint with dictionary in a JSON payload.  This may be an empty di
   
 You will get back a ROB DOCUMENT THIS.
 
+``spectrum/planspectrum``
+*************************
+
+Use this to declare your intent to take a spectrum.  This is here so that multiple observatories can coordinate.  ``spectrum/spectrawanted`` (see above) is able to filter out things that have a planned spectrum.
+
+POST to the dictionary with a JSON payload.  Required keys are:
+
+* ``oid``: string UUID; the object ID of the object you're going to take a spectrum of.  These UUIDs are returned by ``ltcv/gethottransients``.
+* ``facility``: string; the name of the telescope or facility where you will take the spectrm.
+* ``plantime``: string ``YYYY-MM-DD`` or ``YYYY-MM-DD HH:MM:SS``; when you expect to actuallyobtain the spectrum.
+
+You may also include one optional key:
+
+* ``comment``: string, any notes bout your planned spectrum.
+

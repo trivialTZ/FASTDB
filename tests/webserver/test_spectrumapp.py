@@ -334,3 +334,28 @@ def test_get_wanted_spectra( setup_wanted_spectra_etc, fastdb_client ):
     assert str(idmap[1696949]) in [ r['oid'] for r in res['wantedspectra'] ]
     assert str(idmap[1173200]) not in [ r['oid'] for r in res['wantedspectra'] ]
     assert str(idmap[1981540]) not in [ r['oid'] for r in res['wantedspectra'] ]
+
+
+def test_plan_spectrum( setup_wanted_spectra_etc, fastdb_client ):
+    _mjdnow, _now, idmap = setup_wanted_spectra_etc
+
+    # There are three planned spectra in the database from the fixture.
+    # Add another, see if it goes.
+
+    res = fastdb_client.post( '/spectrum/planspectrum',
+                              json={ 'oid': str(idmap[1747042]),
+                                     'facility': 'Second test facility',
+                                     'plantime': '2031-12-13 02:00:00'
+                                    } )
+    assert isinstance( res, dict )
+    assert res['status'] == 'ok'
+
+    with db.DB() as con:
+        cursor = con.cursor( row_factory=psycopg.rows.dict_row )
+        cursor.execute( "SELECT * FROM plannedspectra" )
+        rows = cursor.fetchall()
+
+    assert len(rows) == 4
+    assert set( str(r['root_diaobject_id']) for r in rows ) == { str(idmap[i]) for i in ( 1747042, 1696949, 191776 ) }
+    assert len( [ r for r in rows if r['root_diaobject_id'] == idmap[1747042] ] ) == 2
+    assert set( r['facility'] for r in rows ) == { 'test facility', 'Second test facility' }

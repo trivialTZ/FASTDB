@@ -52,6 +52,7 @@ The servers that get started by ``docker compose`` are, as of this writing::
   * A ``kafka`` zookeeper and a ``kafka`` server.  (TODO: use ``kraft`` so we don't need the zookeeper any more.)
   * A ``postgresql`` server
   * A ``mongodb`` server
+  * A "query runner", which is a custom process that handles the "long query" interface
   * A web server that is the FASTDB front end
   * A shell server to which you can connect and run things.
 

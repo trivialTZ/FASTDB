@@ -1,6 +1,7 @@
 import datetime
 import pytz
 import flask
+import uuid
 
 import astropy.time
 
@@ -120,6 +121,39 @@ class WhatSpectraAreWanted( BaseView ):
         return { 'status': 'ok', 'wantedspectra': retarr }
 
 
+# ======================================================================
+# /spectrum/planspectrum
+
+class PlanSpectrum( BaseView ):
+    def do_the_things( self ):
+        try:
+            data = flask.request.json
+
+            if not all( i in data for i in ['oid', 'facility', 'plantime'] ):
+                return "JSON payload must include keys oid, facility, plantime", 500
+
+            try:
+                plantime = datetime.datetime.fromisoformat( data['plantime'] )
+                if plantime.tzinfo is None:
+                    plantime = pytz.utc.localize( plantime )
+                else:
+                    plantime = plantime.astimezone( datetime.UTC )
+            except (TypeError, ValueError):
+                return f"Failed to parse YYYY-MM-DD HH:MM:SS from {data['plantime']}", 500
+
+            kwargs = { 'root_diaobject_id': uuid.UUID( data['oid'] ),
+                       'facility': str( data['facility'] ),
+                       'plantime': plantime,
+                       'comment': data['comment'] if 'comment' in data else None
+                      }
+            plansp = db.PlannedSpectra( **kwargs )
+            plansp.insert( refresh=False )
+
+            return { "status": "ok" }
+
+        except Exception as e:
+            flask.current_app.logger.exception( "Exception in PlanSpectrum" )
+            return f"Exception in PlanSpectrum: {str(e)}", 500
 
 
 # **********************************************************************
@@ -131,6 +165,7 @@ bp = flask.Blueprint( 'spectrumapp', __name__, url_prefix='/spectrum' )
 urls = {
     "/askforspectrum": AskForSpectrum,
     "/spectrawanted": WhatSpectraAreWanted,
+    "/planspectrum": PlanSpectrum,
 }
 
 usedurls = {}
