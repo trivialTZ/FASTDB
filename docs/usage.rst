@@ -119,7 +119,7 @@ You will get back a ROB DOCUMENT THIS.
 
 Use this to declare your intent to take a spectrum.  This is here so that multiple observatories can coordinate.  ``spectrum/spectrawanted`` (see above) is able to filter out things that have a planned spectrum.
 
-POST to the dictionary with a JSON payload.  Required keys are:
+POST to the api endpoint with a JSON payload that is a dict.  Required keys are:
 
 * ``oid``: string UUID; the object ID of the object you're going to take a spectrum of.  These UUIDs are returned by ``ltcv/gethottransients``.
 * ``facility``: string; the name of the telescope or facility where you will take the spectrm.
@@ -128,4 +128,21 @@ POST to the dictionary with a JSON payload.  Required keys are:
 You may also include one optional key:
 
 * ``comment``: string, any notes bout your planned spectrum.
+
+If all is well, you will get back a dictionary with a single key: ``{'status': 'ok'}``
+
+``spectrum/removespectrumplan``
+*******************************
+
+Use this to remove a spectrum plan.  This isn't strictly necessary if you succesfully took a spectrum and reported the info with ``spectrum/reportspectruminfo`` (see below), but you may still use it.  The real use case is if you planned a spectrum, but for whatever reason (e.g. the night was cloudy), you didn't actually get that spectrum.  In that case, you probably want to remove your spectrum plan from FASTDB so that other people won't skip that object thinking you are going to do it.
+
+POST to the api endpoint with a JSON payload that is a dict.  There are two required keywords:
+* ``oid``: string UUID
+* ``facility``: string
+these must match exactly what you passed when you called ``spectrum/planspectrum``.  Any entry in the database matching these two things will be removed.
+
+(Note: there's no authentication check on the specific facility.  Any authenticated user to FASTDB can remove any spectrum plan.  We're trusting that the people who have been given accounts on FASTDB are only going to remove spectrum plans that they themselves submitted, or that the otherwise know are legitimate to remove.)
+
+If all is well, you will get back a dictionary with a two keys.  The value of ``status`` will be ``ok``, and the value of ``ndel`` will be the number of rows deleted from the database.
+
 

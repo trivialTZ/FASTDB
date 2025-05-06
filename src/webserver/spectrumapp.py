@@ -156,6 +156,33 @@ class PlanSpectrum( BaseView ):
             return f"Exception in PlanSpectrum: {str(e)}", 500
 
 
+# ======================================================================
+# /spectrum/removespectrumplan
+
+class RemoveSpectrumPlan( BaseView ):
+    def do_the_things( self ):
+        try:
+            data = flask.request.json
+
+            if ( 'oid' not in data ) or ( 'facility' not in data ):
+                return "JSON payload must include keys oid and facility", 500
+
+            with db.DB() as con:
+                cursor = con.cursor()
+                cursor.execute( "DELETE FROM plannedspectra WHERE root_diaobject_id=%(id)s "
+                                "  AND facility=%(fac)s",
+                                { 'id': data['oid'],
+                                  'fac': data['facility'] } )
+                nrows = cursor.rowcount
+                con.commit()
+
+            return { 'status': 'ok', 'ndel': nrows }
+
+        except Exception as e:
+            flask.current_app.logger.exception( "Exception in RemoveSpectrumPlan" )
+            return f"Exception in RemoveSpectrumPlan: {str(e)}", 500
+
+
 # **********************************************************************
 # **********************************************************************
 # **********************************************************************
@@ -166,6 +193,7 @@ urls = {
     "/askforspectrum": AskForSpectrum,
     "/spectrawanted": WhatSpectraAreWanted,
     "/planspectrum": PlanSpectrum,
+    "/removespectrumplan": RemoveSpectrumPlan,
 }
 
 usedurls = {}
