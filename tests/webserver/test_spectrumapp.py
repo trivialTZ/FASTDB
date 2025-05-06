@@ -145,7 +145,7 @@ def setup_wanted_spectra_etc( procver, alerts_90days_sent_received_and_imported,
             con.commit()
 
         yield mjdnow, now, idmap
-            
+
     finally:
         with db.DB() as con:
             cursor = con.cursor()
@@ -201,8 +201,8 @@ def test_ask_for_spectra( procver, alerts_90days_sent_received_and_imported, fas
 
 
 def test_get_wanted_spectra( setup_wanted_spectra_etc, fastdb_client ):
-    mjdnow, now, idmap = setup_wanted_spectra_etc
-    
+    mjdnow, _now, idmap = setup_wanted_spectra_etc
+
     # Test 1 : If we pass nothing (except for mjd_now, which we need
     #   for the test), we should get all spectra ever requested that
     #   have not been claimed in the last 7 days, that have no
@@ -334,4 +334,3 @@ def test_get_wanted_spectra( setup_wanted_spectra_etc, fastdb_client ):
     assert str(idmap[1696949]) in [ r['oid'] for r in res['wantedspectra'] ]
     assert str(idmap[1173200]) not in [ r['oid'] for r in res['wantedspectra'] ]
     assert str(idmap[1981540]) not in [ r['oid'] for r in res['wantedspectra'] ]
-
