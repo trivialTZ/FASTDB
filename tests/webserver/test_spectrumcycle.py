@@ -76,7 +76,7 @@ def test_get_wanted_spectra( procver, alerts_90days_sent_received_and_imported, 
     # The latest detection at all to make it into daisource is from
     #  MJD 60362.33 = 2024-02-22T07:55:12Z
 
-    mjdnow = 60326.5
+    mjdnow = 60362.5
     now = datetime.datetime.utcfromtimestamp( astropy.time.Time( mjdnow, format='mjd', scale='tai' ).unix_tai )
     now = pytz.utc.localize( now )
     try:
@@ -95,7 +95,7 @@ def test_get_wanted_spectra( procver, alerts_90days_sent_received_and_imported, 
                             "VALUES (%(wid)s,%(rid)s,%(t)s,%(uid)s,%(req)s,%(prio)s)",
                             { 'wid': uuid.uuid4(),
                               'rid': idmap[1696949],
-                              't': now,
+                              't': now - datetime.timedelta( minutes=1 ),
                               'uid': test_user.id,
                               'req': 'requester1',
                               'prio': 3 } )
@@ -141,7 +141,7 @@ def test_get_wanted_spectra( procver, alerts_90days_sent_received_and_imported, 
                             "VALUES (%(wid)s,%(rid)s,%(t)s,%(uid)s,%(req)s,%(prio)s)",
                             { 'wid': uuid.uuid4(),
                               'rid': idmap[1173200],
-                              't': now - datetime.timedelta( days=2 ),
+                              't': now - datetime.timedelta( days=1 ),
                               'uid': test_user.id,
                               'req': 'requester2',
                               'prio': 5 } )
@@ -191,13 +191,133 @@ def test_get_wanted_spectra( procver, alerts_90days_sent_received_and_imported, 
         #   for the test), we should get all spectra ever requested that
         #   have not been claimed in the last 7 days, that have no
         #   observed spectra in the last 7 days, and that have been detected
-        #   in the last 7 days.  That should throw out 1696949 and 191776
+        #   in the last 14 days.  That should throw out 1696949 and 191776
         #   (both requested in the last 7 days), as well as 1747042 and
-        #   1173200, leaving only 1981540
+        #   1173200 (neither detected in the last 14 days), leaving only 1981540.
+        # 1981540 only has one requester, so there should only be one entry
+        #   in the resutant list.
 
         res = fastdb_client.post( '/spectrum/spectrawanted', json={ 'mjd_now': mjdnow } )
-        import pdb; pdb.set_trace()
-        pass
+        assert isinstance( res, dict )
+        assert res['status'] == 'ok'
+        assert len( res['wantedspectra'] ) == 1
+        assert str( res['wantedspectra'][0]['oid'] ) == str( idmap[1981540] )
+
+        # Test 2 : set a bunch of filters to None to see if we get everything
+        # We should get back *6* responses.  Five objects, but one is requested
+        #   by two different requesters.
+        res = fastdb_client.post( '/spectrum/spectrawanted', json={ 'mjd_now': mjdnow,
+                                                                    'not_claimed_in_last_days': None,
+                                                                    'detected_since_mjd': None,
+                                                                    'no_spectra_in_last_days': None } )
+        assert len( res['wantedspectra'] ) == 6
+        assert set( r['req'] for r in res['wantedspectra'] ) == { 'requester1', 'requester2' }
+        assert len( set( r['oid'] for r in res['wantedspectra'] ) ) == 5
+
+        # Test 3: Like last time, but set no_spectra_in_last_days to 1; shouldn't change the result
+        res = fastdb_client.post( '/spectrum/spectrawanted', json={ 'mjd_now': mjdnow,
+                                                                    'not_claimed_in_last_days': None,
+                                                                    'detected_since_mjd': None,
+                                                                    'no_spectra_in_last_days': 1 } )
+        assert len( res['wantedspectra'] ) == 6
+        assert set( r['req'] for r in res['wantedspectra'] ) == { 'requester1', 'requester2' }
+        assert len( set( r['oid'] for r in res['wantedspectra'] ) ) == 5
+
+        # Test 4: Now no_spectra_in_last_days is 3, should filter out 191776
+        res = fastdb_client.post( '/spectrum/spectrawanted', json={ 'mjd_now': mjdnow,
+                                                                    'not_claimed_in_last_days': None,
+                                                                    'detected_since_mjd': None,
+                                                                    'no_spectra_in_last_days': 3 } )
+        assert len( res['wantedspectra'] ) == 5
+        assert set( r['req'] for r in res['wantedspectra'] ) == { 'requester1', 'requester2' }
+        assert len( set( r['oid'] for r in res['wantedspectra'] ) ) == 4
+        assert str( idmap[191776] ) not in [ r['oid'] for r in res['wantedspectra'] ]
+
+        # Test 5: no_spectra_in_last_days defaults to 7, filters out 191776 again
+        res = fastdb_client.post( '/spectrum/spectrawanted', json={ 'mjd_now': mjdnow,
+                                                                    'not_claimed_in_last_days': None,
+                                                                    'detected_since_mjd': None } )
+        assert len( res['wantedspectra'] ) == 5
+        assert set( r['req'] for r in res['wantedspectra'] ) == { 'requester1', 'requester2' }
+        assert len( set( r['oid'] for r in res['wantedspectra'] ) ) == 4
+        assert str( idmap[191776] ) not in [ r['oid'] for r in res['wantedspectra'] ]
+
+        # Test 6: using only the detected_since_mjd test, put in 60330, should filter out
+        #   1173200 -- which is the one requested by requester2
+        res = fastdb_client.post( '/spectrum/spectrawanted', json={ 'mjd_now': mjdnow,
+                                                                    'not_claimed_in_last_days': None,
+                                                                    'detected_since_mjd': 60330.,
+                                                                    'no_spectra_in_last_days': None } )
+        assert len( res['wantedspectra'] ) == 4
+        assert all( r['req'] == 'requester1' for r in res['wantedspectra'] )
+        assert set( r['oid'] for r in res['wantedspectra'] ) == { str(idmap[i]) for i in
+                                                                  [ 1696949, 1981540, 191776, 1747042 ] }
+
+
+        # Test 7: detected_in_last_days = 15 should throw out 1747042 and 1173200
+        res = fastdb_client.post( '/spectrum/spectrawanted', json={ 'mjd_now': mjdnow,
+                                                                    'not_claimed_in_last_days': None,
+                                                                    'detected_in_last_days': 15,
+                                                                    'no_spectra_in_last_days': None } )
+        assert len( res['wantedspectra'] ) == 3
+        assert all( r['req'] == 'requester1' for r in res['wantedspectra'] )
+        assert set( r['oid'] for r in res['wantedspectra'] ) == { str(idmap[i]) for i in
+                                                                  [ 1696949, 1981540, 191776 ] }
+
+        # Test 8: passing both detected_in_last_days and detected_since_mjd should ignore ..._last_days
+        res = fastdb_client.post( '/spectrum/spectrawanted', json={ 'mjd_now': mjdnow,
+                                                                    'not_claimed_in_last_days': None,
+                                                                    'detected_since_mjd': 60330.,
+                                                                    'detected_in_last_days': 15,
+                                                                    'no_spectra_in_last_days': None } )
+        assert len( res['wantedspectra'] ) == 4
+        assert all( r['req'] == 'requester1' for r in res['wantedspectra'] )
+        assert set( r['oid'] for r in res['wantedspectra'] ) == { str(idmap[i]) for i in
+                                                                  [ 1696949, 1981540, 191776, 1747042 ] }
+
+        # Test 10 and 11: check requester
+        res = fastdb_client.post( '/spectrum/spectrawanted', json={ 'mjd_now': mjdnow,
+                                                                    'requester': 'requester1',
+                                                                    'not_claimed_in_last_days': None,
+                                                                    'detected_since_mjd': None,
+                                                                    'no_spectra_in_last_days': None } )
+        assert len( res['wantedspectra'] ) == 5
+        assert all( r['req'] == 'requester1' for r in res['wantedspectra'] )
+        assert len( set( r['oid'] for r in res['wantedspectra'] ) ) == 5
+
+        res = fastdb_client.post( '/spectrum/spectrawanted', json={ 'mjd_now': mjdnow,
+                                                                    'requester': 'requester2',
+                                                                    'not_claimed_in_last_days': None,
+                                                                    'detected_since_mjd': None,
+                                                                    'no_spectra_in_last_days': None } )
+        assert len( res['wantedspectra'] ) == 1
+        assert res['wantedspectra'][0]['req'] == 'requester2'
+        assert res['wantedspectra'][0]['oid'] == str( idmap[1173200] )
+
+        # Test 12: lim_mag = 23.0 should throw out 1173200 and 1747042
+        res = fastdb_client.post( '/spectrum/spectrawanted', json={ 'mjd_now': mjdnow,
+                                                                    'not_claimed_in_last_days': None,
+                                                                    'detected_since_mjd': None,
+                                                                    'no_spectra_in_last_days': None,
+                                                                    'lim_mag': 23. } )
+        assert len( res['wantedspectra'] ) == 3
+        assert len( set( r['oid'] for r in res['wantedspectra'] ) ) == 3
+        assert str(idmap[1696949]) in [ r['oid'] for r in res['wantedspectra'] ]
+        assert str(idmap[1173200]) not in [ r['oid'] for r in res['wantedspectra'] ]
+        assert str(idmap[1747042]) not in [ r['oid'] for r in res['wantedspectra'] ]
+
+        # Test 13: lim_mag = 23.0 and lim_mag_band='r' should throw out 1981540 and 1173200
+        res = fastdb_client.post( '/spectrum/spectrawanted', json={ 'mjd_now': mjdnow,
+                                                                    'not_claimed_in_last_days': None,
+                                                                    'detected_since_mjd': None,
+                                                                    'no_spectra_in_last_days': None,
+                                                                    'lim_mag': 23.3,
+                                                                    'lim_mag_band': 'r'} )
+        assert len( res['wantedspectra'] ) == 3
+        assert len( set( r['oid'] for r in res['wantedspectra'] ) ) == 3
+        assert str(idmap[1696949]) in [ r['oid'] for r in res['wantedspectra'] ]
+        assert str(idmap[1173200]) not in [ r['oid'] for r in res['wantedspectra'] ]
+        assert str(idmap[1981540]) not in [ r['oid'] for r in res['wantedspectra'] ]
 
     finally:
         with db.DB() as con:

@@ -1,4 +1,4 @@
-import re
+import io
 import datetime
 import pytz
 import flask
@@ -9,6 +9,10 @@ import astropy.time
 
 import db
 from webserver.baseview import BaseView
+
+# Want this to be False except when
+#  doing deep-in-the-weeds debugging
+_show_way_too_much_debug_info = False
 
 
 # ======================================================================
@@ -60,26 +64,17 @@ class WhatSpectraAreWanted( BaseView ):
 
         lim_mag_band = data['lim_mag_band'] if 'lim_mag_band' in data else None
         lim_mag = float( data['lim_mag'] ) if 'lim_mag' in data else None
+        requester = data['requester'] if 'requester' in data else None
 
         if 'requested_since' in data.keys():
-            match = re.search( r'^ *(?P<y>\d+)-(?P<m>\d+)-(?P<d>\d+)'
-                               r'(?P<time>[ T]+(?P<H>\d+):(?P<M>\d+):(?P<S>\d+))? *$',
-                               data['requested_since'] )
-            if match is None:
-                return f"Failed to parse YYYY-MM-DD HH:MM:SS from {data['requestedsince']}", 500
-
-            y = int( match.group('y') )
-            m = int( match.group('m') )
-            d = int( match.group('d') )
-            if match.group('time') is not None:
-                hour = int( match.group( 'H' ) )
-                minute = int( match.group( 'M' ) )
-                second = int( match.group( 'S' ) )
-            else:
-                hour = 0
-                minute = 0
-                second = 0
-            wantsince = datetime.datetime( y, m, d, hour, minute, second, tzinfo=datetime.UTC )
+            try:
+                wantsince = datetime.datetime.fromisoformat( data['requested_since'] )
+                if wantsince.tzinfo is None:
+                    wantsince = pytz.utc.localize( wantsince )
+                else:
+                    wantsince = wantsince.astimezone( datetime.UTC )
+            except (TypeError, ValueError):
+                return f"Failed to parse YYYY-MM-DD HH:MM:SS from {data['requested_since']}", 500
         else:
             wantsince = None
 
@@ -96,13 +91,11 @@ class WhatSpectraAreWanted( BaseView ):
             mjdnow = astropy.time.Time( now ).mjd
 
 
-        notclaimedindays = ( 7 if 'not_claimed_in_last_days' not in data.keys()
-                             else int( data['not_claimed_in_last_days'] ) )
-        claimsince = ( now - datetime.timedelta( days=notclaimedindays )
-                       if notclaimedindays is not None else None )
+        notclaimedindays = 7 if 'not_claimed_in_last_days' not in data.keys() else data['not_claimed_in_last_days']
+        claimsince = now - datetime.timedelta( days=int(notclaimedindays) ) if notclaimedindays is not None else None
 
-        nospecindays = 7 if 'no_spectra_in_last_days' not in data.keys() else int( data['no_spectra_in_last_days'] )
-        nospecsince = ( astropy.time.Time( now - datetime.timedelta( days=nospecindays ) ).mjd
+        nospecindays = 7 if 'no_spectra_in_last_days' not in data.keys() else data['no_spectra_in_last_days']
+        nospecsince = ( astropy.time.Time( now - datetime.timedelta( days=int(nospecindays) ) ).mjd
                         if nospecindays is not None else None )
 
         if 'detected_since_mjd' in data.keys():
@@ -157,8 +150,10 @@ class WhatSpectraAreWanted( BaseView ):
             q += f"  {whereand} subq.wanttime<=%(now)s "
             if wantsince is not None:
                 q += "    AND subq.wanttime>=%(wanttime)s "
+            if requester is not None:
+                q += "    AND requester=%(requester)s "
             q += "  GROUP BY root_diaobject_id,requester,priority )"
-            subdict =  { 'wanttime': wantsince, 'reqtime': claimsince, 'now': now }
+            subdict =  { 'wanttime': wantsince, 'reqtime': claimsince, 'now': now, 'requester': requester }
             tmpcur = psycopg.ClientCursor( con )
             logger.debug( f"Sending query: {tmpcur.mogrify(q,subdict)}" )
             cursor.execute( q, subdict )
@@ -170,6 +165,15 @@ class WhatSpectraAreWanted( BaseView ):
                 return { 'status': 'ok', 'wantedspectra': [] }
             else:
                 logger.debug( f"{row[0][0]} rows in tmp_wanted" )
+            if _show_way_too_much_debug_info:
+                cursor.execute( "SELECT * FROM tmp_wanted" )
+                sio = io.StringIO()
+                sio.write( "Contents of tmp_wanted:\n" )
+                sio.write( f"{'UUID':36s} {'requester':16s} priority\n" )
+                sio.write( "------------------------------------ ---------------- --------\n" )
+                for row in cursor.fetchall():
+                    sio.write( f"{str(row[0]):36s} {row[1]:16s} {row[2]:2d}\n" )
+                logger.debug( sio.getvalue() )
 
             # Filter that table by throwing out things that have a spectruminfo whose mjd is greater than
             #   obstime.
@@ -198,6 +202,15 @@ class WhatSpectraAreWanted( BaseView ):
                 return { 'status': 'ok', 'wantedspectra': [] }
             else:
                 logger.debug( f"{row[0][0]} rows in tmp_wanted2" )
+            if _show_way_too_much_debug_info:
+                cursor.execute( "SELECT * FROM tmp_wanted2" )
+                sio = io.StringIO()
+                sio.write( "Contents of tmp_wanted2:\n" )
+                sio.write( "------------------------------------ ---------------- --------\n" )
+                sio.write( f"{'UUID':36s} {'requester':16s} priority\n" )
+                for row in cursor.fetchall():
+                    sio.write( f"{str(row[0]):36s} {row[1]:16s} {row[2]:2d}\n" )
+                logger.debug( sio.getvalue() )
 
             # Filter that table by throwing out things that do not have a detection since detsince
             if detsince is None:
@@ -226,32 +239,55 @@ class WhatSpectraAreWanted( BaseView ):
                 return { 'status': 'ok', 'wantedspectra': [] }
             else:
                 logger.debug( f"{row[0][0]} rows in tmp_wanted3\n" )
+            if _show_way_too_much_debug_info:
+                cursor.execute( "SELECT * FROM tmp_wanted3" )
+                sio = io.StringIO()
+                sio.write( "Contents of tmp_wanted3:\n" )
+                sio.write( f"{'UUID':36s} {'requester':16s} priority\n" )
+                sio.write( "------------------------------------ ---------------- --------\n" )
+                for row in cursor.fetchall():
+                    sio.write( f"{str(row[0]):36s} {row[1]:16s} {row[2]:2d}\n" )
+                logger.debug( sio.getvalue() )
 
 
             # Get the latest *detection* (source) for the objects
             cursor.execute( "CREATE TEMP TABLE tmp_latest_detection( root_diaobject_id UUID, "
-                            "                                        mjd double precision, mag real ) " )
+                            "                                        mjd double precision, "
+                            "                                        band text, mag real ) " )
             q = ( "INSERT INTO tmp_latest_detection ( "
                   "  SELECT root_diaobject_id, mjd, band, mag "
                   "  FROM ( "
                   "    SELECT DISTINCT ON (t.root_diaobject_id) t.root_diaobject_id,"
                   "           s.band AS band, s.midpointmjdtai AS mjd, "
                   "           CASE WHEN s.psfflux>0 THEN -2.5*LOG(s.psfflux)+31.4 ELSE 99 END AS mag "
-                  "    FROM tmp_wanted_3 t "
-                  "    INNER JOIN diaobject_root_map dorm ON t.root_diaobject_id=r.rootid "
-                  "    INNER JOIN diasource s ON dorm.diaobjectid=s.diaobjectid "
-                  "                           AND dorm.processing_version=s.diaobject_procver "
+                  "    FROM tmp_wanted3 t "
+                  "    INNER JOIN diaobject_root_map r ON t.root_diaobject_id=r.rootid "
+                  "    INNER JOIN diasource s ON r.diaobjectid=s.diaobjectid "
+                  "                           AND r.processing_version=s.diaobject_procver "
                   "    WHERE s.midpointmjdtai<=%(now)s " )
             if procver is not None:
                 q += "    AND s.processing_version=%(procver)s "
             if lim_mag_band is not None:
                 q += "    AND s.band=%(band)s "
-            q += "    GROUP BY t.root_diaobjecct_id ORDER BY mjd DESC ) subq ) "
+            q += "    ORDER BY t.root_diaobject_id,mjd DESC ) subq ) "
             cursor.execute( q, { 'procver': procver, 'band': lim_mag_band, 'now': mjdnow } )
+
+            cursor.execute( "SELECT COUNT(*) FROM tmp_latest_detection" )
+            logger.debug( f"{cursor.fetchone()[0]} rows in tmp_latest_detection" )
+            if _show_way_too_much_debug_info:
+                cursor.execute( "SELECT root_diaobject_id,mjd,band,mag FROM tmp_latest_detection" )
+                sio = io.StringIO()
+                sio.write( "Contents of tmp_latest_detection:\n" )
+                sio.write( f"{'UUID':36s} {'mjd':8s} {'band':6s} {'mag':6s}\n" )
+                sio.write( "------------------------------------ -------- ------ ------\n" )
+                for row in cursor.fetchall():
+                    sio.write( f"{str(row[0]):36s} {row[1]:8.2f} {row[2]:6s} {row[3]:6.2f}\n" )
+                logger.debug( sio.getvalue() )
 
             # Get the latest forced source for the objects
             cursor.execute( "CREATE TEMP TABLE tmp_latest_forced( root_diaobject_id UUID, "
-                            "                                     mjd double precision, mag real ) " )
+                            "                                     mjd double precision, "
+                            "                                     band text, mag real ) " )
             q = ( "INSERT INTO tmp_latest_forced ( "
                   "  SELECT root_diaobject_id, mjd, band, mag "
                   "  FROM ( "
@@ -259,19 +295,35 @@ class WhatSpectraAreWanted( BaseView ):
                   "           f.band AS band, f.midpointmjdtai AS mjd, "
                   "           CASE WHEN f.psfflux>0 THEN -2.5*LOG(f.psfflux)+31.4 ELSE 99 END AS mag "
                   "    FROM tmp_wanted3 t "
-                  "    INNER JOIN diaobject_root_map dorm ON t.root_diaobject_id=r.rootid "
-                  "    INNER JOIN diaforcedsource f ON dorm.diaobjectid=f.diaobjectid "
-                  "                                 AND dorm.processing_version=f.diaobject_procver "
-                  "    WHERE f.midpointmjdnai<=%(now)s " )
+                  "    INNER JOIN diaobject_root_map r ON t.root_diaobject_id=r.rootid "
+                  "    INNER JOIN diaforcedsource f ON r.diaobjectid=f.diaobjectid "
+                  "                                 AND r.processing_version=f.diaobject_procver "
+                  "    WHERE f.midpointmjdtai<=%(now)s " )
             if procver is not None:
                 q += "      AND f.processing_version=%(procver)s "
             if lim_mag_band is not None:
                 q += "     AND f.band=%(band)s "
-            q += "    GROUP BY t.root_diaobjecct_id ORDER BY mjd DESC ) "
+            q += "    ORDER BY t.root_diaobject_id,mjd DESC ) AS subq ) "
             cursor.execute( q, { 'procver': procver, 'band': lim_mag_band, 'now': mjdnow } )
+
+            cursor.execute( "SELECT COUNT(*) FROM tmp_latest_forced" )
+            logger.debug( f"{cursor.fetchone()[0]} rows in tmp_latest_forced" )
+            if _show_way_too_much_debug_info:
+                cursor.execute( "SELECT root_diaobject_id,mjd,band,mag FROM tmp_latest_forced" )
+                sio = io.StringIO()
+                sio.write( "Contents of tmp_latest_forced:\n" )
+                sio.write( f"{'UUID':36s} {'mjd':8s} {'band':6s} {'mag':6s}\n" )
+                sio.write( "------------------------------------ -------- ------ ------\n" )
+                for row in cursor.fetchall():
+                    sio.write( f"{str(row[0]):36s} {row[1]:8.2f} {row[2]:6s} {row[3]:6.2f}\n" )
+                logger.debug( sio.getvalue() )
 
             # Get object info.  Notice that if a processing version wasn't requested,
             #   you get a semi-random one....
+            cursor.execute( "CREATE TEMP TABLE tmp_object_info( root_diaobject_id UUID, requester text, "
+                            "                                   priority smallint, diaobjectid bigint, "
+                            "                                   processing_version int, "
+                            "                                   ra double precision, dec double precision )" )
             q = ( "INSERT INTO tmp_object_info ( "
                   "  SELECT DISTINCT ON (t.root_diaobject_id) t.root_diaobject_id, t.requester, "
                   "                                           t.priority, o.diaobjectid, o.processing_version, "
@@ -285,11 +337,27 @@ class WhatSpectraAreWanted( BaseView ):
             q += ")"
             cursor.execute( q, { 'procver': procver } )
 
+            cursor.execute( "SELECT COUNT(*)_ FROM tmp_object_info" )
+            logger.debug( f"{cursor.fetchone()[0]} rows in tmp_object_info" )
+            if _show_way_too_much_debug_info:
+                cursor.execute( "SELECT root_diaobject_id,requester,priority,diaobjectid,processing_version,ra,dec "
+                                "FROM tmp_object_info" )
+                sio = io.StringIO()
+                sio.write( "Contents of tmp_object_info:\n" )
+                sio.write( f"{'UUID':36s} {'requester':16s} {'prio':4s} {'diaobjectid':12s} {'pver':4s} "
+                           f"{'ra':8s} {'dec':8s}\n" )
+                sio.write( "------------------------------------ ---------------- ---- ------------ ---- "
+                           "-------- --------\n" )
+                for row in cursor.fetchall():
+                    sio.write( f"{str(row[0]):36s} {row[1]:16s} {row[2]:4d} {row[3]:12d} {row[4]:4d} "
+                               f"{row[5]:8.4f} {row[6]:8.4f}\n" )
+                logger.debug( sio.getvalue() )
+
             # Join all the things and pull
             q = ( "SELECT t.root_diaobject_id, t.requester, t.priority, o.ra, o.dec, "
                   "       s.mjd AS src_mjd, s.band AS src_band, s.mag AS src_mag, "
-                  "       f.mjd AS frced_mjd, s.band AS frced_band, f.mag AS frced_mag "
-                  "FROM tmp_wanted3 "
+                  "       f.mjd AS frced_mjd, f.band AS frced_band, f.mag AS frced_mag "
+                  "FROM tmp_wanted3 t "
                   "INNER JOIN tmp_object_info o ON t.root_diaobject_id=o.root_diaobject_id "
                   "LEFT JOIN tmp_latest_detection s ON t.root_diaobject_id=s.root_diaobject_id "
                   "LEFT JOIN tmp_latest_forced f ON t.root_diaobject_id=f.root_diaobject_id" )
@@ -299,13 +367,23 @@ class WhatSpectraAreWanted( BaseView ):
 
         # Filter by limiting magnitude if necessary
         if lim_mag is not None:
-            df['forcednewer'] = ( ( (~df['src_mjd'].isnull()) & (~df['frced_mjd'].isnull())
-                                    & (df['frced_mjd']>=df['srced_mjd'] ) )
+            df['forcednewer'] = ( ( ( ~df['src_mjd'].isnull() ) & ( ~df['frced_mjd'].isnull() )
+                                      & ( df['frced_mjd']>=df['src_mjd'] ) )
                                   |
-                                  ( (df['src_mjd'].isnull()) & (~df['forced_mjd'].isnull()) ) )
+                                  ( ( df['src_mjd'].isnull() ) & ( ~df['frced_mjd'].isnull() ) ) )
+            if _show_way_too_much_debug_info:
+                widthbu = pandas.options.display.width
+                maxcolbu = pandas.options.display.max_columns
+                pandas.options.display.width = 4096
+                pandas.options.display.max_columns = None
+                debugdf = df.loc[ :, ['root_diaobject_id','src_mjd','src_band','src_mag',
+                                      'frced_mjd','frced_band','frced_mag','forcednewer'] ]
+                logger.debug( f"df:\n{debugdf}" )
+                pandas.options.display.width = widthbu
+                pandas.options.display.max_columns = maxcolbu
             df = df[ ( df['forcednewer'] & ( df['frced_mag'] <= lim_mag ) )
                      |
-                     ( (~df['forcednewer']) & ( df['src-mag'] <= lim_mag ) ) ]
+                     ( (~df['forcednewer']) & ( df['src_mag'] <= lim_mag ) ) ]
 
 
         # Build the return structure
@@ -319,9 +397,9 @@ class WhatSpectraAreWanted( BaseView ):
                              'latest_source_band': row.src_band,
                              'latest_source_mjd': row.src_mjd,
                              'latest_source_mag': row.src_mag,
-                             'latest_forced_band': row.forced_band,
-                             'latest_forced_mjd': row.forced_mjd,
-                             'latest_forced_mag': row.forced_mag } )
+                             'latest_forced_band': row.frced_band,
+                             'latest_forced_mjd': row.frced_mjd,
+                             'latest_forced_mag': row.frced_mag } )
 
         return { 'status': 'ok', 'wantedspectra': retarr }
 
