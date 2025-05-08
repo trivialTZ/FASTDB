@@ -1,0 +1,17 @@
+cd /global/cfs/cdirs/lsst/groups/TD/SOFTWARE/fastdb_deployment/resspect_test/FASTDB
+
+Do
+
+  autoreconf --install
+
+if necessary, then:
+
+  touch aclocal.m4 configure
+  find . -name Makefile.am -exec touch \{\} \;
+  find . -name Makefile.in -exec touch \{\} \;
+  ./configure \
+    --with-installdir=/global/cfs/cdirs/lsst/groups/TD/SOFTWARE/fastdb_deployment/resspect_test/install \
+    --with-smtp-server=smtp.lbl.gov \
+    --with-smtp-port=25 \
+    --with-email-from=raknop@lbl.gov
+  make install
