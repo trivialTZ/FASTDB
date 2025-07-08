@@ -7,8 +7,18 @@ import subprocess
 
 from pymongo import MongoClient
 
-from db import ProcessingVersion, DiaObject, DiaSource, DiaForcedSource, Snapshot, DB, AuthUser
-from util import asUUID
+from db import ( ProcessingVersion,
+                 RootDiaObject,
+                 DiaObject,
+                 DiaObjectRootMap,
+                 DiaSource,
+                 DiaForcedSource,
+                 Snapshot,
+                 DB,
+                 AuthUser )
+from util import asUUID, logger
+from fastdb.fastdb_client import FASTDBClient
+
 
 sys.path.insert( 0, pathlib.Path(__file__).parent )
 # For cleanliness, a bunch of fixtures are broken
@@ -102,7 +112,33 @@ def snapshot2():
 
 
 @pytest.fixture
-def obj1( procver1 ):
+def rootobj1():
+    objid = asUUID( '00f85226-c42f-4e1d-8adf-f18b9353a176' )
+    obj = RootDiaObject( id=objid )
+    obj.insert()
+
+    yield obj
+    with DB() as con:
+        cursor = con.cursor()
+        cursor.execute( "DELETE FROM root_diaobject WHERE id=%(id)s", { 'id': objid } )
+        con.commit()
+
+
+@pytest.fixture
+def rootobj2():
+    objid = asUUID( 'a9f0b54b-dc70-4276-b07b-728ad7a1465d' )
+    obj = RootDiaObject( id=objid )
+    obj.insert()
+
+    yield obj
+    with DB() as con:
+        cursor = con.cursor()
+        cursor.execute( "DELETE FROM root_diaobject WHERE id=%(id)s", { 'id': objid } )
+        con.commit()
+
+
+@pytest.fixture
+def obj1( procver1, rootobj1 ):
     obj = DiaObject( diaobjectid=42,
                      processing_version=procver1.id,
                      radecmjdtai=60000.,
@@ -111,11 +147,17 @@ def obj1( procver1 ):
                     )
     obj.insert()
 
+    rootmap = DiaObjectRootMap( rootid=rootobj1.id, diaobjectid=42, processing_version=procver1.id )
+    rootmap.insert()
+
     yield obj
     with DB() as con:
         cursor = con.cursor()
-        cursor.execute( "DELETE FROM diaobject WHERE diaobjectid=%(id)s AND processing_Version=%(pv)s",
-                        { 'id': obj.diaobjectid, 'pv': procver1.id } )
+        subdict = { 'rootid': rootobj1.id, 'id': obj.diaobjectid, 'pv': procver1.id }
+        cursor.execute( ( "DELETE FROM diaobject_root_map "
+                          "WHERE rootid=%(rootid)s AND diaobjectid=%(id)s AND processing_version=%(pv)s" ),
+                        subdict )
+        cursor.execute( "DELETE FROM diaobject WHERE diaobjectid=%(id)s AND processing_Version=%(pv)s", subdict )
         con.commit()
 
 
@@ -261,6 +303,11 @@ tyOci9saPPfI1bNnKD202zsCAwEAAQ==
 
 
 @pytest.fixture( scope='session' )
+def fastdb_client( test_user ):
+    return FASTDBClient( 'http://webap:8080', username="test", password="test_password", verify=False, debug=True )
+
+
+@pytest.fixture( scope='session' )
 def snana_fits_ppdb_loaded():
     e2td = pathlib.Path( "elasticc2_test_data" )
     assert e2td.is_dir()
@@ -278,6 +325,7 @@ def snana_fits_ppdb_loaded():
         com.extend( dirs )
         com.append( "--do" )
 
+        logger.info( f"Running a subprocess with command: {com}" )
         res = subprocess.run( com, capture_output=True )
         assert res.returncode == 0
 

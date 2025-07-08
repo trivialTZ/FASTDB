@@ -7,6 +7,7 @@ if [ ! -f $POSTGRES_DATA_DIR/PG_VERSION ]; then
     psql --command "CREATE DATABASE fastdb OWNER postgres"
     psql --command "CREATE EXTENSION q3c" fastdb
     psql --command "CREATE EXTENSION pgcrypto" fastdb
+    psql --command "CREATE EXTENSION pg_hint_plan" fastdb
     ropasswd=`cat /secrets/postgres_ro_password`
     psql --command "CREATE USER postgres_ro PASSWORD '${ropasswd}'"
     psql --command "GRANT CONNECT ON DATABASE fastdb TO postgres_ro"

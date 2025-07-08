@@ -10,6 +10,16 @@
 /src/config.py
 /src/webserver/Makefile
 /share/Makefile
+/client/Makefile
+
+# Sphinx debris
+docs/_build/**
+!docs/_build/.placeholder
+docs/_static/**
+!docs/_static/.placeholder
+docs/_templates/**
+!docs/_templates/.placeholder
+
 
 # Test install location
 install/

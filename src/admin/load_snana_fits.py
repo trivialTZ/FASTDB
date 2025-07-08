@@ -51,16 +51,15 @@ class ColumnMapper:
         n = "" if n == 1 else str(n)
 
         mapper = { f'HOSTGAL{n}_OBJID': 'objectid',
-                   'MJD_TRIGGER': 'psradectai',
-                   f'HOSTGAL{n}_RA': 'psra',
-                   f'HOSTGAL{n}_DEC': 'psdec',
+                   f'HOSTGAL{n}_RA': 'ra',
+                   f'HOSTGAL{n}_DEC': 'dec',
                    f'HOSTGAL{n}_PHOTOZ': 'pzmean',
                    f'HOSTGAL{n}_PHOTOZ_ERR': 'pzstd',
                   }
         lcs = {}
         for band in [ 'u', 'g', 'r', 'i', 'z', 'Y' ]:
-            mapper[ f'HOSTGAL{n}_MAG_{band}' ] = f'stdcolor_{band.lower()}'
-            mapper[ f'HOSTGAL{n}_MAGERR_{band}' ] = f'stdcolor_{band.lower()}_err'
+            mapper[ f'HOSTGAL{n}_MAG_{band}' ] = f'mag_{band.lower()}'
+            mapper[ f'HOSTGAL{n}_MAGERR_{band}' ] = f'mag_{band.lower()}_err'
         for quant in range(0, 110, 10):
             mapper[ f'HOSTGAL{n}_ZPHOT_Q{quant:03d}' ] = f'pzquant{quant:03d}'
 
@@ -171,8 +170,35 @@ class FITSFileHandler( ColumnMapper ):
             hostgal = hostgal[ hostgal[ 'objectid' ] > 0 ]
             hostgal = astropy.table.unique( hostgal, keys='objectid' )
             hostgal.add_column( [ str(uuid.uuid4()) for i in range(len(hostgal)) ], name='id' )
+
+            # Calculate some derived quantities and remove the quantities we don't need
+            #   from the table.  Also turn Rick's -99's into None (I think!)
+            tp5ln10 = np.log( 10 ) * 2.5
+            hostgal.add_column( 10. ** (-0.4 * ( hostgal['mag_r'] - 31.4 ) ), name='petroflux_r' )
+            hostgal.add_column( tp5ln10 * hostgal['mag_r_err'] * hostgal['petroflux_r'], name='petroflux_r_err' )
+            hostgal[hostgal['mag_r'] < 0]['petroflux_r' ] = None
+            hostgal[hostgal['mag_r'] < 0]['petroflux_r_err' ] = None
+
+            bands = [ 'u', 'g', 'r', 'i', 'z', 'y' ]
+            for bandi in range( len(bands)-1 ):
+                hostgal.add_column( hostgal[f'mag_{bands[bandi]}'] - hostgal[f'mag_{bands[bandi+1]}'],
+                                    name=f'stdcolor_{bands[bandi]}_{bands[bandi+1]}' )
+                hostgal.add_column( np.sqrt( hostgal[f'mag_{bands[bandi]}']**2 + hostgal[f'mag_{bands[bandi+1]}']**2 ),
+                                    name=f'stdcolor_{bands[bandi]}_{bands[bandi+1]}_err' )
+                hostgal[ hostgal[f'mag_{bands[bandi]}'] < 0][f'stdcolor_{bands[bandi]}_{bands[bandi+1]}' ] = None
+                hostgal[ hostgal[f'mag_{bands[bandi+1]}'] < 0][f'stdcolor_{bands[bandi]}_{bands[bandi+1]}' ] = None
+                hostgal[ hostgal[f'mag_{bands[bandi]}'] < 0][f'stdcolor_{bands[bandi]}_{bands[bandi+1]}_err' ] = None
+                hostgal[ hostgal[f'mag_{bands[bandi+1]}'] < 0][f'stdcolor_{bands[bandi]}_{bands[bandi+1]}_err' ] = None
+
+            for bandi in bands:
+                hostgal.remove_column( f'mag_{bandi}'  )
+                hostgal.remove_column( f'mag_{bandi}_err' )
+
             if not self.ppdb:
                 hostgal.add_column( self.processing_version, name='processing_version' )
+
+            # At this point, hostgal should be ready for feeding to bulk_insert_or_upsert
+            #   (onced processed through dict()).
 
             # Build the diaobject table in head
             self.diaobject_map_columns( head )
@@ -270,6 +296,26 @@ class FITSFileHandler( ColumnMapper ):
             #     = -2.5 * log10( f/nJy * 1e-9 ) + 8.90
             #     = -2.5 * log10( f/nJy ) - ( 2.5 * -9 ) + 8.90
             #     = -2.5 * log10( f/nJY ) + 31.4
+            #
+            # We want "visit" to be meaningful.  SNANA doesn't have that
+            # concept, but practically speaking, two visits can't happen
+            # at the same time, so we'll turn MJD into visit.  The
+            # biggest MJD we can expect is less than 70000, and exposure
+            # times of 15s mean mjds should differ by more than ~0.0002.
+            # mjd*20000 should therefore be a safe unique integer, 70000
+            # * 20000 < 2^31, and visit is a 32-bit integer (I did 2^31
+            # to account for only using positive numbers), so doing a
+            # floor of that should work.  (Floating-point roundoff is
+            # not a real worry, because what *really* matters for how we
+            # use it is that two observations at the same time *of the
+            # same object* have the same visit number.  The floating
+            # point mjd comes from a single source there, so there's no
+            # worry of the same mjd having been calculated two different
+            # ways and being off in the last bit or two of precision.)
+            # (In the SNANA files, MJD is a double, which has 53 bits in
+            # the mantissa, and 53 is way more than 31, so we don't have
+            # to worry about our integers not being perfectly
+            # represented when we multiply mjd by 20000.)
 
             phot['FLUXCAL'] *= 10 ** ( ( 31.4 - self.snana_zeropoint ) / 2.5 )
             phot['FLUXCALERR'] *= 10 ** ( ( 31.4 - self.snana_zeropoint ) / 2.5 )
@@ -302,7 +348,8 @@ class FITSFileHandler( ColumnMapper ):
                 phot['diaobjectid'][pmin:pmax+1] = headrow['diaobjectid']
                 if not self.ppdb:
                     phot['diaobject_procver'][pmin:pmax+1] = headrow['processing_version']
-                phot['visit'][pmin:pmax+1] = obj['SNID']             # Just something
+                phot['visit'][pmin:pmax+1] = np.array( np.floor( phot['midpointmjdtai'][pmin:pmax+1] * 20000 ),
+                                                       dtype=np.int32 )
                 phot['diaforcedsourceid'][pmin:pmax+1] = ( obj['SNID'] * self.max_sources_per_object
                                                            + np.arange( pmax - pmin + 1 ) )
                 phot['ra'][pmin:pmax+1] = obj['RA']

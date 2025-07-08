@@ -53,6 +53,19 @@ dbname = config.dbdatabase
 
 # ======================================================================
 
+def get_dbcon():
+    """Get a database connection.
+
+    It's your responsibility to roll it back, close it, etc!
+
+    Consider using the DB context manager instead of this.
+    """
+
+    global dbuser, dbpasswd, dbhost, dbport, dbname
+    conn = psycopg.connect( dbname=dbname, user=dbuser, password=dbpasswd, host=dbhost, port=dbport )
+    return conn
+
+
 @contextmanager
 def DB( dbcon=None ):
     """Get a database connection in a context manager.
@@ -77,10 +90,9 @@ def DB( dbcon=None ):
         yield dbcon
         return
 
+    conn = None
     try:
-        global dbuser, dbpasswd, dbhost, dbport, dbname
-        conn = None
-        conn = psycopg.connect( dbname=dbname, user=dbuser, password=dbpasswd, host=dbhost, port=dbport )
+        conn = get_dbcon()
         yield conn
     finally:
         if conn is not None:
@@ -784,6 +796,14 @@ class ProcessingVersion( DBBase ):
 
 # ======================================================================
 
+class ProcessingVersionAlias( DBBase ):
+    __tablename__ = "processing_version_alias"
+    _tablemeta = None
+    _pk = [ 'description' ]
+
+
+# ======================================================================
+
 class Snapshot( DBBase ):
     __tablename__ = "snapshot"
     _tablemeta = None
@@ -860,6 +880,27 @@ class DiaForcedSourceSnapshot( DBBase ):
     __tablename__ = "diaforcedsource_snapshot"
     _tablemeta = None
     _pk = [ 'diaforcedsourceid', 'processing_version', 'snapshot' ]
+
+
+# ======================================================================
+# Spectrum cycle tables
+
+class SpectrumInfo( DBBase ):
+    __tablename__ = "spectruminfo"
+    _tablemeta = None
+    _pk = [ 'specinfo_id' ]
+
+
+class WantedSpectra( DBBase ):
+    __tablename__ = "wantedspectra"
+    _tablemeta = None
+    _pk = [ 'wantspec_id' ]
+
+
+class PlannedSpectra( DBBase ):
+    __tablename__ = "plannedspectra"
+    _tablemeta = None
+    _pk = [ 'plannedspec_id' ]
 
 
 # ======================================================================

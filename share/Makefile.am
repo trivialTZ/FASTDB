@@ -1,4 +1,4 @@
-AUTOMAKE_OPTION = subdicr-objects
+AUTOMAKE_OPTION = subdir-objects
 
 sharedir = @installdir@/share
 avscdir = @installdir@/share/avsc

@@ -7,26 +7,25 @@
 CREATE TABLE ppdb_host_galaxy(
   id UUID PRIMARY KEY NOT NULL DEFAULT gen_random_uuid(),
   objectid bigint NOT NULL,
-  psradectai real,
-  psra double precision,
-  psdec double precision,
-  stdcolor_u real,
-  stdcolor_g real,
-  stdcolor_r real,
-  stdcolor_i real,
-  stdcolor_z real,
-  stdcolor_y real,
-  stdcolor_u_err real,
-  stdcolor_g_err real,
-  stdcolor_r_err real,
-  stdcolor_i_err real,
-  stdcolor_z_err real,
-  stdcolor_y_err real,
+  ra double precision,
+  dec double precision,
+  petroflux_r real,
+  petroflux_r_err real,
+  stdcolor_u_g real,
+  stdcolor_g_r real,
+  stdcolor_r_i real,
+  stdcolor_i_z real,
+  stdcolor_z_y real,
+  stdcolor_u_g_err real,
+  stdcolor_g_r_err real,
+  stdcolor_r_i_err real,
+  stdcolor_i_z_err real,
+  stdcolor_z_y_err real,
   pzmode real,
   pzmean real,
   pzstd real,
   pzskew real,
-  pskurt real,
+  pzkurt real,
   pzquant000 real,
   pzquant010 real,
   pzquant020 real,
@@ -74,13 +73,16 @@ CREATE TABLE ppdb_diaobject(
   pmdec_parallax_cov real,
   pmra_pmdec_cov real
 );
-CREATE INDEX idx_ppdb_diaobject_nearbyext1 ON ppdb_diaobject(nearbyextobj1id);
+CREATE INDEX idx_ppdb_diaobject_nearbyext1id ON ppdb_diaobject(nearbyextobj1id);
+CREATE INDEX idx_ppdb_diaobject_nearbyext1 ON ppdb_diaobject(nearbyextobj1);
 ALTER TABLE ppdb_diaobject ADD CONSTRAINT fk_ppdb_diaobject_nearbyext1
   FOREIGN KEY (nearbyextobj1id) REFERENCES ppdb_host_galaxy(id) ON DELETE SET NULL;
-CREATE INDEX idx_ppdb_diaobject_nearbyext2 ON ppdb_diaobject(nearbyextobj2id);
+CREATE INDEX idx_ppdb_diaobject_nearbyext2id ON ppdb_diaobject(nearbyextobj2id);
+CREATE INDEX idx_ppdb_diaobject_nearbyext2 ON ppdb_diaobject(nearbyextobj2);
 ALTER TABLE ppdb_diaobject ADD CONSTRAINT fk_ppdb_diaobject_nearbyext2
   FOREIGN KEY (nearbyextobj2id) REFERENCES ppdb_host_galaxy(id) ON DELETE SET NULL;
-CREATE INDEX idx_ppdb_diaobject_nearbyext3 ON ppdb_diaobject(nearbyextobj3id);
+CREATE INDEX idx_ppdb_diaobject_nearbyext3id ON ppdb_diaobject(nearbyextobj3id);
+CREATE INDEX idx_ppdb_diaobject_nearbyext3 ON ppdb_diaobject(nearbyextobj3);
 ALTER TABLE ppdb_diaobject ADD CONSTRAINT fk_ppdb_diaobject_nearbyext3
   FOREIGN KEY (nearbyextobj3id) REFERENCES ppdb_host_galaxy(id) ON DELETE SET NULL;
 

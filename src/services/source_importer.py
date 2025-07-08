@@ -40,7 +40,7 @@ class SourceImporter:
                               'scienceFlux', 'scienceFluxErr', 'time_processed', 'time_withdrawn' ]
 
 
-    def __init__( self, processing_version ):
+    def __init__( self, processing_version, object_match_radius=1. ):
         """Create a SourceImporter.
 
         Parameters
@@ -49,8 +49,13 @@ class SourceImporter:
             The processing version.  This must be the key of a valid
             entry in the processing_version table.
 
+          object_match_radius : float, default 1.
+            Objects within this many arcsec of an existing object will be considered
+            the same root_diaobject.
+
         """
-        self.processing_version = processing_version
+        self.processing_version = int( processing_version )
+        self.object_match_radius = float( object_match_radius )
 
 
     def _read_mongo_fields( self, pqconn, collection, pipeline, fields, temptable, liketable,
@@ -191,11 +196,54 @@ class SourceImporter:
             self.read_mongo_objects( pqconn, collection, t0=t0, t1=t1, batchsize=batchsize )
 
             cursor = pqconn.cursor()
-            cursor.execute( "INSERT INTO diaobject ( SELECT * FROM temp_diaobject_import ) ON CONFLICT DO NOTHING" )
+
+            # Filter the temp table to just new objects
+            cursor.execute( "DROP TABLE IF EXISTS temp_new_diaobject" )
+            cursor.execute( "CREATE TEMP TABLE temp_new_diaobject AS "
+                            "( SELECT tdi.* FROM temp_diaobject_import tdi "
+                            "  LEFT JOIN diaobject o ON "
+                            "    o.diaobjectid=tdi.diaobjectid AND o.processing_version=tdi.processing_version "
+                            "  WHERE o.diaobjectid IS NULL )" )
+
+            # Populate the objects table.  We could just do this straight from
+            #  temp_diaobject_import and have ON CONFLICT DO NOTHING.  However,
+            #  we'll need temp_new_diaobject for later steps, so that's why
+            #  we did that first.
+            cursor.execute( "INSERT INTO diaobject ( SELECT * FROM temp_new_diaobject )" )
+            nobjs = cursor.rowcount
+
+            # Link new objects to existing root objects
+            cursor.execute( "DROP TABLE IF EXISTS temp_diaobject_root_map" )
+            cursor.execute( "CREATE TEMP TABLE temp_diaobject_root_map AS "
+                            "( SELECT drm.rootid AS rootid, tno.diaobjectid AS diaobjectid, "
+                            "         tno.processing_version AS processing_version "
+                            "  FROM diaobject_root_map drm "
+                            "  INNER JOIN diaobject o "
+                            "    ON o.diaobjectid=drm.diaobjectid AND o.processing_version=drm.processing_version "
+                            "  INNER JOIN temp_new_diaobject tno "
+                            "    ON q3c_join( tno.ra, tno.dec, o.ra, o.dec, %(rad)s) )",
+                            { 'rad': self.object_match_radius/3600. } )
+            cursor.execute( "INSERT INTO diaobject_root_map(rootid, diaobjectid, processing_version) "
+                            "(SELECT * FROM temp_diaobject_root_map)" )
+
+            # Create new root objects
+            cursor.execute( "DROP TABLE IF EXISTS temp_diaobject_new_root_map" )
+            cursor.execute( "CREATE TEMP TABLE temp_diaobject_new_root_map AS "
+                            "( SELECT gen_random_uuid() AS rootid, tno.diaobjectid AS diaobjectid, "
+                            "         tno.processing_version AS processing_version "
+                            "  FROM temp_new_diaobject tno "
+                            "  LEFT JOIN diaobject_root_map drm ON "
+                            "    tno.diaobjectid=drm.diaobjectid AND tno.processing_version=drm.processing_version "
+                            "  WHERE drm.diaobjectid IS NULL )" )
+            cursor.execute( "INSERT INTO root_diaobject(id) SELECT rootid FROM temp_diaobject_new_root_map" )
+            cursor.execute( "INSERT INTO diaobject_root_map(rootid, diaobjectid, processing_version) "
+                            "(SELECT * FROM temp_diaobject_new_root_map)" )
+            nroot = cursor.rowcount
+
             if commit:
                 pqconn.commit()
 
-            return cursor.rowcount
+            return nobjs, nroot
 
 
     def import_sources_from_collection( self, collection, t0=None, t1=None, batchsize=10000,
@@ -309,7 +357,7 @@ class SourceImporter:
             cursor.execute( "SET CONSTRAINTS fk_diasource_diaobject DEFERRED" )
             cursor.execute( "SET CONSTRAINTS fk_diaforcedsource_diaobject DEFERRED" )
 
-            nobj = self.import_objects_from_collection( collection, t0, t1, conn=pqconn, commit=False )
+            nobj, nroot = self.import_objects_from_collection( collection, t0, t1, conn=pqconn, commit=False )
             nsrc = self.import_sources_from_collection( collection, t0, t1, conn=pqconn, commit=False )
             nprvsrc = self.import_prvsources_from_collection( collection, t0, t1, conn=pqconn, commit=False )
             nprvfrc = self.import_prvforcedsources_from_collection( collection, t0, t1, conn=pqconn, commit=False )
@@ -328,7 +376,7 @@ class SourceImporter:
             # The timestamp will be updated if and only if everything imported.
             pqconn.commit()
 
-        return nobj, nsrc + nprvsrc, nprvfrc
+        return nobj, nroot, nsrc + nprvsrc, nprvfrc
 
 
 # ======================================================================
