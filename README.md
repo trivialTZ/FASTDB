@@ -10,6 +10,6 @@ make html
 
 Then, point your web browser at:
 ```
-file:///path/to/checkout/docs/_build/index.html
+file:///path/to/checkout/docs/_build/html/index.html
 ```
 replacing `/path/to/checkout` with the absolute path of your git checkout.

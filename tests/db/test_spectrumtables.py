@@ -80,7 +80,7 @@ class TestWantedSpectra( BaseTestDB ):
         t0 = datetime.datetime.now( tz=datetime.UTC )
         t1 = t0 + datetime.timedelta( days=1 )
         t2 = t1 + datetime.timedelta( days=2 )
-        self.obj1 = WantedSpectra( wantspec_id=uuid.UUID( 'cce5c7fd-8034-4f1d-b51e-e01ac1827979' ),
+        self.obj1 = WantedSpectra( wantspec_id=f'{rootobj1.id} ; testquester1',
                                    root_diaobject_id=rootobj1.id,
                                    wanttime=t0,
                                    user_id=test_user.id,
@@ -92,7 +92,7 @@ class TestWantedSpectra( BaseTestDB ):
                        'user_id': test_user.id,
                        'requester': "Test Requester 1",
                        'priority': 1 }
-        self.obj2 = WantedSpectra( wantspec_id=uuid.UUID( 'df387069-1fd5-44ba-955d-45c767b4dfea' ),
+        self.obj2 = WantedSpectra( wantspec_id=f'{rootobj2.id} ; testquester2',
                                    root_diaobject_id=rootobj2.id,
                                    wanttime=t1,
                                    user_id=test_user.id,
@@ -104,7 +104,7 @@ class TestWantedSpectra( BaseTestDB ):
                        'user_id': test_user.id,
                        'requester': "Test Requester 2",
                        'priority': 2 }
-        self.dict3 = { 'wantspec_id': uuid.UUID( '3b949438-64b8-4177-b3cc-c1448e31e16b' ),
+        self.dict3 = { 'wantspec_id': f'{rootobj1.id} ; testquester3',
                        'root_diaobject_id': rootobj1.id,
                        'wanttime': t2,
                        'user_id': test_user.id,

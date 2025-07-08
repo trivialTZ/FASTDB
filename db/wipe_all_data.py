@@ -6,7 +6,7 @@ data_tables = [ 'processing_version', 'processing_version_alias', 'snapshot',
                'diaobject_root_map', 'diaobject_snapshot', 'diasource_snapshot', 'diaforcedsource_snapshot',
                'diasource_import_time', 'query_queue', 'migrations_applied',
                'spectruminfo', 'wantedspectra', 'plannedspectra',
-               'ppdb_alerts_sent', 'ppdb_diaforcedsource', 'ppdb_diaobject', 'ppdb_diasource', 'ppdb_host_galaxy'
+               'ppdb_alerts_sent', 'ppdb_diaforcedsource', 'ppdb_diaobject', 'ppdb_diasource', 'ppdb_host_galaxy' ]
 
 import sys
 import psycopg
