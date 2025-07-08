@@ -230,7 +230,7 @@ In that directory, make sure there are subdirectories ``install``, ``query_resul
   git checkout <version>
   git submodule update --init
 
-The ``.yaml`` files defining the Spin workloads are in ``admin/spin/rknop_dev`` in the git archive.  (Note that, unless I've screwed up, the files ``secrets.yaml`` and ``webserver-cert.yaml`` will not be complete, because those are the kinds of things you don't want to commit to a public git archive.  Edit those files to put in the actual passwords and SSL key/certificates before using them, and **make sure to remove the secret stuff before committing anything to git**.)  To install the code to work with those ``.yaml`` files, run::
+The ``.yaml`` files defining the Spin workloads are in ``admin/spin/rknop_dev`` in the git archive.  (Note that, unless I've screwed up (...which has happend...), the files ``secrets.yaml`` and ``webserver-cert.yaml`` will not be complete, because those are the kinds of things you don't want to commit to a public git archive.  Edit those files to put in the actual passwords and SSL key/certificates before using them, and **make sure to remove the secret stuff before   committing anything to git**.  If you screw up, you have to change **all** the secrets.)  To install the code to work with those ``.yaml`` files, run::
 
   cd /global/cfs/cdirs/lsst/groups/TD/SOFTWARE/fastdb_deployment/rknop_dev/FASTDB
   touch aclocal.m4 configure
