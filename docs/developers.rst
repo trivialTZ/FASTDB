@@ -200,6 +200,25 @@ TODO : instructions for accessing the mongo database.
 .. _creating-a-persistent-test-user:
 
 
+Setting yourself up to futz around with the web app
+---------------------------------------------------
+
+There will eventually be a better way to do this, as the current method is needlessly slow.  Right now, if you want to have a database with some stuff loaded into it for purposes of developing the web UI, what you can do is get yourself fully set up for tests, and then, inside the shell container, run::container, run::
+
+  cd /code/tests
+  pytest -v --trace services/test_sourceimporter.py::test_import_30days_60days
+
+This takes a little while to run (up to a minute), because what it's really doing is testing a whole bunhch of different servers, an there are built in sleeps so that each step of the test can be sure that other servers have had time to do their stuff.  The ``--trace`` argument tells pytest to stop right at the beginning of the test, but after all fixutres have run.  The shell where you run this will dump you into a ``(Pdb)`` prompt.  Just leave that shell sitting there.  At this point, you have a loaded database.  You can look at ``localhost:8080`` in your web browser to see the web ap, and log in with user ``test`` and password ``test_password``.
+
+When you're done futzing around with the web ap, just press ``c`` and hit Enter at the ``(Pdb)`` prompt, and the test will exit, (ideally) cleaning up after itself.
+
+If you edit the web ap software and what to see the changes, you need to do a couple of things to see the changes.  First, you need to re-install the code.  On a shell inside the container (a different one from the one where your ``(Pdb)`` prompt is sitting), do ``cd /code`` and ``make install``.  (If you've added files, not just edited them, there is more to do; ROB TODO document this.)   Second, you need to get a shell on the webap.  Outside any container, in the ``tests`` directory, run ``docker compose exec -it webap /bin/bash``.  On the shell inside the webap container, run::
+
+  kill -HUP 1
+
+If all is well, then your webserver is now running the new code; shift-reload it in your browser to see it.  If the webap shell immediately exits after this ``kill`` command, it means you broker the server-side software enough that it no longer runs.  Do ``docker compose logs webap`` to see the logs, and try to fix the errors.  Once you've fixed them, you will need to do ``docker compose down webap`` and ``docker compose up -d webap`` to get the webap running again.
+
+
 Creating a persistent test user
 -------------------------------
 
