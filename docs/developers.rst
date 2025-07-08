@@ -52,6 +52,7 @@ The servers that get started by ``docker compose`` are, as of this writing::
   * A ``kafka`` zookeeper and a ``kafka`` server.  (TODO: use ``kraft`` so we don't need the zookeeper any more.)
   * A ``postgresql`` server
   * A ``mongodb`` server
+  * A "query runner", which is a custom process that handles the "long query" interface
   * A web server that is the FASTDB front end
   * A shell server to which you can connect and run things.
 
@@ -115,7 +116,7 @@ The first ``[DIR]`` is the directory where you want to install the code.  The SM
 
 as usual with GNU autotools to see what other options are available.  If you're making a production install of FASTDB somewhere, you will definitely want to do things like configure the database connection.
 
-It's possible that after running the first command, you'll get errors about Makefiles being out of date or the like.  There are two possibilites; one is that you do legimiately need to rebuild the autotools file, in which case see :ref:`autoreconf-install` below.  If you haven't, it may ba result of an unfortunate interaction between autotools and git; autotools (at least some versions) looks at timestamps, but git checkouts do not restore timestamps of files committed to the archive.  In this case, you can run::
+It's possible that after running the first command, you'll get errors about ``aclocal-1.16 is missing on your system`` or something similar.  There are two possibilites; one is that you do legimiately need to rebuild the autotools file, in which case see :ref:`autoreconf-install` below.  If you haven't, it may ba result of an unfortunate interaction between autotools and git; autotools (at least some versions) looks at timestamps, but git checkouts do not restore timestamps of files committed to the archive.  In this case, you can run::
 
   touch aclocal.m4 configure
   find . -name Makefile.am -exec touch \{\} \;
@@ -203,4 +204,4 @@ The ``.yaml`` files defining the Spin workloads are in ``admin/spin/rknop_dev`` 
     --with-email-from=raknop@lbl.gov
   make install
 
-
+This is necessary because the docker image for the web ap does *not* have the fastdb code baked into it.  Rather, it bind mounds the ``install`` directory and uses the code there.  (This allows development without having to rebuild the docker image.)
