@@ -1,10 +1,7 @@
+import { fastdbap } from "./fastdb_ns.js"
 import { rkAuth } from "./rkauth.js";
 import { rkWebUtil } from "./rkwebutil.js";
-
-// Namespace
-
-var fastdbap = {};
-
+import "./objectsearch.js"
 
 // **********************************************************************
 // **********************************************************************
@@ -79,9 +76,15 @@ fastdbap.Context = class
         
         // Object search
         
-        this.objectsearch = rkWebUtil.elemaker( "div", this.topbox, { "classes": [ "objectsearch" ] } );
-        rkWebUtil.elemaker( "h3", this.objectsearch, { "text": "Object Search" } );
+        this.searchbox = rkWebUtil.elemaker( "div", this.topbox, { "classes": [ "searchbox" ] } );
+        this.searchtabs = new rkWebUtil.Tabbed( this.searchbox, {} );
 
+        this.objectsearchdiv = rkWebUtil.elemaker( "div", null );
+        this.searchtabs.addTab( "objectsearch", "Object Search", this.objectsearchdiv, true );
+        
+        this.objectsearch = new fastdbap.ObjectSearch( this, this.objectsearchdiv );
+        this.objectsearch.render_page();
+        
 
         // **********************************************************************
         // Main div
@@ -141,4 +144,4 @@ fastdbap.Context = class
 // **********************************************************************
 // **********************************************************************
 
-export { fastdbap };
+export { };

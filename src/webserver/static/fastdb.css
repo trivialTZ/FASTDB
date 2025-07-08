@@ -72,7 +72,7 @@ div.basicstats { flex-basis: content;
                  margin-right: 1ex;
                }
 
-div.objectsearch { flex-basis: content;
+div.searchbox { flex-basis: content;
                    min-width: 0;
                    flex-grow: 1;
                    border: 2px solid var(--mostlyfull-color-border);
@@ -88,8 +88,13 @@ div.maindiv { flex-grow: 2;
               border: 2px solid var(--main-color);
             }
 
-                         
-
+div.innerdiv { flex-grow: 1;
+               flex-shrink: 1;
+               min-height: 0;
+               min-width: 0;
+               padding: 0.5ex;
+               border: 2px solid var(--half-faded-color);
+             }
 
 .good { color: var(--good-color) }
 .bad { color: var(--bad-color) }
@@ -110,9 +115,15 @@ div.maindiv { flex-grow: 2;
 .hmargin { margin-left: 0.5ex; margin-right: 0.5ex }
 .xmargin { margin-left: 1ex; margin-right: 1ex }
 .mmargin { margin-left: 1em; margin-right: 1em }
+.xmarginright { margin-right: 1ex }
 
+.right { text-align: right }
 .center { text-align: center }
 .vcenter { vertical-align: middle }
+
+.maxwcontent { max-width: fit-content }
+.xscroll { overflow-x: scroll }
+.yscroll { overflow-y: scroll }
 
 .tooltipcolorlesssource { text-decoration: var(--link-decorate);
                           cursor: pointer; }
@@ -168,6 +179,11 @@ tr.greybg { background: var(--lots-faded-color); }
 
 table.exposurelist td { border: 2px solid var(--half-faded-color); }
 tr.heldexposure { font-style: italic; color: var(--some-faded-color); }
+
+table.borderless { border: 0; padding: 0; margin: 0 }
+table.borderless tr { border: 0 }
+table.borderless tr th { border: 0 }
+table.borderless tr td { border: 0 }
 
 div.hbox { display: flex;
            flex-direction: row;
