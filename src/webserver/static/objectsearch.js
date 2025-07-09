@@ -28,7 +28,7 @@ fastdbap.ObjectSearch = class
         rkWebUtil.elemaker( "br", p );
         this.diaobjectid_widget = rkWebUtil.elemaker( "input", p, { "attributes": { "size": 10 } } );
         rkWebUtil.elemaker( "br", p );
-        rkWebUtil.button( p, "Search", (e) => { alert("Not Implemented" ); } );
+        rkWebUtil.button( p, "Show", (e) => { alert("Not Implemented" ); } );
 
         // search by ra/dec
         
@@ -56,5 +56,6 @@ fastdbap.ObjectSearch = class
 }
 
 // **********************************************************************
+// Make it into a module
 
 export { }

@@ -20,6 +20,8 @@
     --warning-color: #c06040;
 }
 
+/* Basic layout created in fastdb.js */
+
 html, body { height: 100%;
              margin: 0;
              padding: 0;
@@ -73,28 +75,24 @@ div.basicstats { flex-basis: content;
                }
 
 div.searchbox { flex-basis: content;
-                   min-width: 0;
-                   flex-grow: 1;
-                   border: 2px solid var(--mostlyfull-color-border);
-                   padding: 0.5ex;
-                 }
+                min-width: 0;
+                flex-grow: 1;
+                border: 2px solid var(--mostlyfull-color-border);
+                padding: 0.5ex;
+              }
 
 div.maindiv { flex-grow: 2;
               flex-shrink: 1;
               min-height: 0;
-              overflow-y: scroll;
               margin-top: 1ex;
               padding: 0.5ex;
               border: 2px solid var(--main-color);
             }
 
-div.innerdiv { flex-grow: 1;
-               flex-shrink: 1;
-               min-height: 0;
-               min-width: 0;
-               padding: 0.5ex;
-               border: 2px solid var(--half-faded-color);
-             }
+div.maindivtab { overflow-y: scroll; }
+
+
+/* Generic formatting */
 
 .good { color: var(--good-color) }
 .bad { color: var(--bad-color) }
@@ -125,6 +123,24 @@ div.innerdiv { flex-grow: 1;
 .xscroll { overflow-x: scroll }
 .yscroll { overflow-y: scroll }
 
+a { color: var(--link-color); text-decoration: var(--link-decoration); cursor: pointer; }
+
+div.hbox { display: flex;
+           flex-direction: row;
+           min-width: 0;
+           min-height: 0; }
+
+div.vbox { display: flex;
+           flex-direction: column;
+           min-width: 0;
+           min-height: 0; }
+
+div.footer { color: var(--some-faded-color);
+             font-size: 75%;
+             font-style: italic }
+
+/* Tool tips */
+
 .tooltipcolorlesssource { text-decoration: var(--link-decorate);
                           cursor: pointer; }
 .tooltipsource { color: var(--link-color);
@@ -140,10 +156,11 @@ div.innerdiv { flex-grow: 1;
 }
 .tooltipsource:hover .tooltiptext, .tooltipcolorlesssource:hover .tooltiptext { visibility: visible; }
 
+/* TODO-- do we really want all images like this? */
+
 img { image-rendering: pixelated }
-a { color: var(--link-color); text-decoration: var(--link-decoration); cursor: pointer; }
 
-
+/* rkwebutil tabbed */
 
 .tabunsel { background: var(--most-faded-color);
             border: 2px outset var(--full-color-border);
@@ -159,6 +176,7 @@ div.tabcontentdiv { border: 2px solid var(--mostlyfull-color-border);
                     padding: 0.5ex;
                   }
 
+/* Table formatting options */
 
 table { border: 2px solid var(--full-color-border); border-spacing: 2px }
 table th { border-bottom: 2px solid var(--full-color-border); font-weight: bold }
@@ -185,16 +203,3 @@ table.borderless tr { border: 0 }
 table.borderless tr th { border: 0 }
 table.borderless tr td { border: 0 }
 
-div.hbox { display: flex;
-           flex-direction: row;
-           min-width: 0;
-           min-height: 0; }
-
-div.vbox { display: flex;
-           flex-direction: column;
-           min-width: 0;
-           min-height: 0; }
-
-div.footer { color: var(--some-faded-color);
-             font-size: 75%;
-             font-style: italic }

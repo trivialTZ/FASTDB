@@ -1,9 +1,11 @@
 import sys
+import re
 import pathlib
 import logging
 import uuid
 
 import fastavro
+import astropy.time
 
 _schema_namespace = 'fastdb_test_0.1'
 
@@ -32,6 +34,83 @@ def asUUID( id ):
 NULLUUID = asUUID( '00000000-0000-0000-0000-000000000000' )
 
 
+# These next few will, by design, raise an exception of d[kw] isn't empty and can't be parsed to the right thing
+
+def float_or_none_from_dict( d, kw ):
+    return ( None if ( ( kw not in d ) or ( d[kw] is None ) or ( len( d[kw].strip() ) == 0 ) )
+             else float( kw[d].strip() ) )
+
+
+def int_or_none_from_dict( d, kw ):
+    return ( None if ( ( kw not in d ) or ( d[kw] is None ) or ( len( d[kw].strip() ) == 0 ) )
+             else int( kw[d].strip() ) )
+
+
+def datetime_or_none_from_dict_mjd_or_timestring( d, kw ):
+    if ( kw not in d ) or ( d[kw] is None ) or ( len( d[kw].strip() ) == 0 ):
+        return None
+
+    try:
+        dateval = rkwebutil.asDateTime( d[kw].strip(), defaultutc=True )
+        return dateval
+    except rkwebutil.ErrorMsg as ex:
+        mjd = float( d[kw].strip() )
+        return astropy.time.Time( mjd, format='mjd' ).to_datetime()
+
+
+def mjd_or_none_from_dict_mjd_or_timestring( d, kw ):
+    if ( kw not in d ) or ( d[kw] is None ) or ( len( d[kw].strip() ) == 0 ):
+        return None
+
+    try:
+        dateval = rkwebutil.asDateTime( d[kw], defaultutc=True )
+        return astropy.time.Time( dateval, format='datetime' ).mjd
+    except rkwebutil.ErrorMsg:
+        return float( d[kw].strip() )
+
+
+_sexigesimalre = re.compile( '^\s*(?P<sign>[\-\+])?\s*(?P<d>[0-9]{0,3})\s*:\s*(?P<m>[0-9]{0,2})'
+                             '\s*:\s*(?P<s>[0-9]*\.?[0-9]+)\s*$' )
+def parse_sexigesimal( val, deg=True ):
+    global _sexigesimalre
+
+    match = _sexigesimalre.search( val )
+    if match is None:
+        raise ValueError( f"Can't parse {val} as sexigesimal" )
+    sgn = -1 if match.group('sign') == '-' else 1
+    d = int( match.group('d') )
+    if ( deg and d >= 360. ) or ( (not deg) and ( d>=24. ) ):
+        raise ValueError( f"Invalid {'degrees' if deg else 'hours'} {d}" )
+    m = int( match.group('m') )
+    if ( m >= 60. ):
+        raise ValueError( f"Invalid minutes {m}" )
+    s = int( match.group('s') )
+    if ( s >= 60. ):
+        raise ValueError( f"Invalid seconds {s}" )
+
+    return sgn * ( d + m / 60. + s / 3600. )
+        
+    
+def float_or_none_from_dict_float_or_dms( d, kw ):
+    if ( kw not in d ) or ( ( d[kw] is None ) ) or ( len( d[kw].strip() ) == 0 ):
+        return None
+
+    try:
+        return parse_sexigesimal( d[kw], deg=True )
+    except ValueError:
+        return float( d[kw].strip() )
+        
+
+def float_or_none_from_dict_float_or_hms( d, kw ):
+    if ( kw not in d ) or ( ( d[kw] is None ) ) or ( len( d[kw].strip() ) == 0 ):
+        return None
+
+    try:
+        return 15. * parse_sexigesimal( d[kw], deg=False )
+    except ValueError:
+        return float( d[kw].strip() )
+        
+    
 def get_alert_schema( schemadir=None ):
     """Return a dictionary of { name: schema }, plus 'alert_schema_file': Path }"""
 

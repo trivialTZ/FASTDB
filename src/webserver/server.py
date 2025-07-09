@@ -4,6 +4,7 @@ import flask
 import flask_session
 
 import db
+import ltcv
 import webserver.rkauth_flask as rkauth_flask
 import webserver.dbapp as dbapp
 import webserver.ltcvapp as ltcvapp
@@ -86,7 +87,20 @@ class CountThings( BaseView ):
                  'which': which,
                  'count': rows[0][0]
                 }
+    
 
+# ======================================================================
+
+class ObjectSearch( BaseView ):
+    def do_the_things( self, processing_version ):
+        global app
+        logger = flask.current_app.logger
+
+        if not flask.request.is_json:
+            raise TypeError( "POST data was not JSON; send search criteria as a JSON dict" )
+        searchdata = flask.request.json
+
+        return ltcv.object_search( processing_version, return_format='json', **searchdata )
 
 
 # **********************************************************************

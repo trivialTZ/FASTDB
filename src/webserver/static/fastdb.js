@@ -2,6 +2,7 @@ import { fastdbap } from "./fastdb_ns.js"
 import { rkAuth } from "./rkauth.js";
 import { rkWebUtil } from "./rkwebutil.js";
 import "./objectsearch.js"
+import "./objectlist.js"
 
 // **********************************************************************
 // **********************************************************************
@@ -90,10 +91,11 @@ fastdbap.Context = class
         // Main div
         
         this.maindiv = rkWebUtil.elemaker( "div", this.pagebody, { "classes": [ "maindiv" ] } );
-        p = rkWebUtil.elemaker( "p", this.maindiv, { "text": "Main div todo" } );
-        for ( let i of Array(200).keys() ) {
-            rkWebUtil.elemaker( "p", p, { "text": "Line " + i } );
-        }
+        this.maintabs = new rkWebUtil.Tabbed( this.maindiv, {} );
+
+        this.objectlistdiv = rkWebUtil.elemaker( "div", null, { "classes": [ "maindivtab" ] } );
+        this.maintabs.addTab( "objectlist", "Object List", this.objectlistdiv, true );
+        
     };
 
 
@@ -136,6 +138,13 @@ fastdbap.Context = class
                                         (data) => {
                                             self.forced_span.innerHTML = data.count.toString() + " forced";
                                         } );
+    }
+
+    object_search_results( data )
+    {
+        rkWebUtil.wipeDiv( this.objectlistdiv );
+        this.objectlist = new fastdb.ObjectList( this, this.objectlistdiv );
+        this.objectlist.render_page();
     }
 }
 

@@ -4,6 +4,126 @@ import astropy.time
 import pandas
 
 import db
+import util
+import rkwebutil
+
+
+def object_search( processing_version, return_format='json', **kwargs ):
+    knownargs = { 'ra', 'dec',
+                  'mint_firstdetection', 'maxt_firstdetection',
+                  'mint_lastdetection', 'maxt_lastdetection'
+                  'min_numdetections', 'mindt_firstlastdetection','maxdt_firstlastdetection',
+                  'min_bandsdetected', 'min_lastmag', 'max_lastmag' }
+    unknownargs = set( kwargs.keys() ) - knownargs
+    if len( unknownargs ) != 0:
+        raise ValueError( f"Unknown search keywords: {unknownargs}" )
+
+    if return_format not in [ 'json', 'pandas' ]:
+        raise ValueError( "Unknown return format 'return_format'" )
+    
+    with db.DB() as con:
+        cursor = con.cursor()
+
+        # Figure out processing version
+        try:
+            procver = int( processing_version)
+        except Exception:
+            cursor.execute( "SELECT id FROM processing_version WHERE description=%(procver)s",
+                            { 'procver': processing_version } )
+            rows = cursor.fetchall()
+            if len(rows) == 0:
+                cursor.execute( "SELECT id FROM processing_version_alias WHERE description=%(procver)s",
+                                { 'procver': processing_version } )
+                rows = cursor.fetchall()
+                if len(rows) == 0:
+                    raise ValueError( f"Unknown processing version {processing_version}" )
+            procver = rows[0][0]
+        
+        # Filter by ra and dec if given
+        ra = util.float_or_none_from_dict_float_or_hms( kwargs, 'ra' )
+        dec = util.float_or_none_from_dict_float_or_dms( kwargs, 'dec' )
+        if ( ra is None ) != ( dec is None ):
+            raise ValueError( "Must give either both or neither of ra and dec, not just one." )
+
+        nexttable = 'diaobject'
+        if ra is not None:
+            radius = util.float_or_none_from_dict( kwargs, 'radius' )
+            radius = radius if radius is not None else 10.
+            cursor.execute( "SELECT * INTO TEMP TABLE objsearch_tmp1 "
+                            "FROM diaobject "
+                            "WHERE processing_version=%(pv) "
+                            "AND q3c_radial_query( ra, dec, %(ra), %(dec), %(rad) )"
+                            { 'pv': procver, 'ra': ra, 'dec': dec, 'rad': radius/3600. } )
+            nexttable = 'objsearch_tmp1'
+
+        mint_firstdet = util.mjd_or_none_from_dict_mjd_or_timestring( kwargs, 'mint_firstdetection' )
+        maxt_firstdet = util.mjd_or_none_from_dict_mjd_or_timestring( kwargs, 'maxt_firstdetection' )
+        mint_lastdet = util.mjd_or_none_from_dict_mjd_or_timestring( kwargs, 'mint_lastdetection' )
+        maxt_lastdet = util.mjd_or_none_from_dict_mjd_or_timestring( kwargs, 'mint_lastdetection' )
+        if any( i is not None for i in [ mint_firstdet, maxt_firstdet, mint_lastdet, maxt_lastdet ] ):
+            raise NotImplementedError( "Filtering by detection times not yet implemented" )
+
+        min_numdets = util.int_or_none_from_dict( kwargs, 'min_numdetections' )
+        if min_numdets is not None:
+            raise NotImplementedError( "Filtering by number of detections not yet implemented" )
+
+        mindt = util.float_or_none_from_dict( kwargs, 'mindt_firstlastdetection' )
+        maxdt = util.float_or_none_from_dict( kwargs, 'maxdt_firstlastdetection' )
+        if ( mindt is not None ) or ( maxdt is not None ):
+            raise NotImplementedError( "Filtering by time between first and last detection not yet implemented" )
+
+        min_bands = util.int_or_none_from_dict( kwargs, 'min_bandsdetected' )
+        if min_bands is not None:
+            raise NotImplementedError( "Filtering by number of bands detected is not yet implemented" )
+
+        min_lastmag = util.float_or_none_from_dict( kwargs, 'min_lastmag' )
+        max_lastmag = util.float_or_none_from_dict( kwargs, 'max_lastmag' )
+        if ( min_lastmag is not None ) or ( max_lastmag is not None ):
+            raise NotImplementedError( "Filtering by last magnitude not yet implemented" )
+
+
+        if nexttable == 'diaobject':
+            raise RuntimeError( "Error, no search criterion given" )
+        
+        q = ( f"SELECT o.diaobjectid, o.ra, o.dec, s.psfflux AS srcflux, s.midpointmjdtai AS srct, s.band AS srcband, "
+              f"INTO TEMP TABLE objsearch_sources "
+              f"FROM {nexttable} o "
+              f"INNER JOIN diasource s ON o.diaobjectid=s.diaobjectid AND s.processing_version=%(pv)s "
+              f"ORDER BY diaobjectid, srct" )
+        cursor.execute( q, { 'pv': procver } )
+        
+        cursor.execute( "SELECT diaobjectid, ra, dec, COUNT(srcflux) AS ndet, MAX(srcflux) AS maxflux, "
+                        "        LAST(psfflux) AS lastflux, LAST(srcband) AS lastband, LAST(srct) AS lastt "
+                        "INTO TEMP TABLE objsearch_srcstats "
+                        "FROM objsearch_sources "
+                        "GROUP BY diaobjectid, ra, dec" )
+
+        cursor.execute( "SELECT t.diaobjectid, t.ra, t.dec, t.ndet, t.maxflux, t.lastflux, t.lastband, t.lastt "
+                        "       f.midpointmjdtai AS frct, f.psfflux AS frcflux, f.psffluxerr AS frcdflux, "
+                        "       f.band AS frcband "
+                        "INTO TEMP TABLE objsearch_forced "
+                        "FROM objsearch_srcstats "
+                        "INNER JOIN diaforcedsource f ON t.diaobjectid=f.diaobjectid AND f.processing_version=%(pv)s "
+                        "ORDER BY diaobjectid, frct",
+                        { 'pv': procver } )
+        cursor.execute( "SELECT diaobjectid, ra, dec, ndet, maxflux, lastflux, lastband, lastt, "
+                        "       LAST(frct) AS lastfrcedt, LAST(frcflux) AS lastfrcflux, "
+                        "       LAST(lastfrcdflux) AS lastfrcdflux, LAST(lastfrband) AS lastfrcband "
+                        "FROM objsearch_forced "
+                        "GROUP BY diaobjectid, ra, dec, ndet, maxflux, lastflux, lastband, lastt" )
+        columns = [ d[0] for d in cursor.description ]
+        colummap = { cursor.description[i][0]: i for i in range( len(cursor.description) ) }
+        rows = cursor.fetchall()
+        
+
+    if return_format == 'json':
+        return { c: [ r[ colummap[c] ] ] for c in columns }
+
+    elif return_format == 'pandas':
+        return pandas.DataFrame( rows, columns=columns )
+
+    else:
+        raise RuntimeError( "This should never happen." )
 
 
 def get_hot_ltcvs( processing_version, detected_since_mjd=None, detected_in_last_days=None,
