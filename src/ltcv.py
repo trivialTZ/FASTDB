@@ -1,26 +1,56 @@
 import datetime
+import numbers
 
 import astropy.time
 import pandas
 
 import db
 import util
-import rkwebutil
+
+
+def procver_int( processing_version, dbcon=None ):
+    if isinstance( processing_version, numbers.Integral ):
+        return processing_version
+    with db.DB( dbcon ) as con:
+        cursor = con.cursor()
+        cursor.execute( "SELECT id FROM processing_version WHERE description=%(pv)s", { 'pv': processing_version } )
+        row = cursor.fetchone()
+        if row is not None:
+            return row[0]
+        cursor.execute( "SELECT id FROM processing_version_alias WHERE description=%(pv)s",
+                        { 'pv': processing_version } )
+        row = cursor.fetchone()
+        if row is None:
+            raise ValueError( f"Unknown processing version {processing_version}" )
+        return row[0]
 
 
 def object_search( processing_version, return_format='json', **kwargs ):
-    knownargs = { 'ra', 'dec',
+    knownargs = { 'ra', 'dec', 'radius',
                   'mint_firstdetection', 'maxt_firstdetection',
                   'mint_lastdetection', 'maxt_lastdetection'
                   'min_numdetections', 'mindt_firstlastdetection','maxdt_firstlastdetection',
-                  'min_bandsdetected', 'min_lastmag', 'max_lastmag' }
+                  'min_bandsdetected', 'min_lastmag', 'max_lastmag',
+                  'statbands' }
     unknownargs = set( kwargs.keys() ) - knownargs
     if len( unknownargs ) != 0:
         raise ValueError( f"Unknown search keywords: {unknownargs}" )
 
     if return_format not in [ 'json', 'pandas' ]:
-        raise ValueError( "Unknown return format 'return_format'" )
-    
+        raise ValueError( f"Unknown return format {return_format}" )
+
+    statbands = None
+    if 'statbands' in kwargs:
+        if ( isinstance( kwargs['statbands'], str ) ) and ( len(kwargs['statbands'].strip()) == 0 ):
+            statbands = None
+        else:
+            if isinstance( kwargs['statbands'], list ):
+                statbands = kwargs['statbands']
+            else:
+                statbands = [ kwargs['statbands'] ]
+            if not all( isinstance(b, str) for b in statbands ):
+                return TypeError( 'statbands must be a str or a list of str' )
+
     with db.DB() as con:
         cursor = con.cursor()
 
@@ -38,7 +68,7 @@ def object_search( processing_version, return_format='json', **kwargs ):
                 if len(rows) == 0:
                     raise ValueError( f"Unknown processing version {processing_version}" )
             procver = rows[0][0]
-        
+
         # Filter by ra and dec if given
         ra = util.float_or_none_from_dict_float_or_hms( kwargs, 'ra' )
         dec = util.float_or_none_from_dict_float_or_dms( kwargs, 'dec' )
@@ -51,8 +81,8 @@ def object_search( processing_version, return_format='json', **kwargs ):
             radius = radius if radius is not None else 10.
             cursor.execute( "SELECT * INTO TEMP TABLE objsearch_tmp1 "
                             "FROM diaobject "
-                            "WHERE processing_version=%(pv) "
-                            "AND q3c_radial_query( ra, dec, %(ra), %(dec), %(rad) )"
+                            "WHERE processing_version=%(pv)s "
+                            "AND q3c_radial_query( ra, dec, %(ra)s, %(dec)s, %(rad)s )",
                             { 'pv': procver, 'ra': ra, 'dec': dec, 'rad': radius/3600. } )
             nexttable = 'objsearch_tmp1'
 
@@ -84,40 +114,59 @@ def object_search( processing_version, return_format='json', **kwargs ):
 
         if nexttable == 'diaobject':
             raise RuntimeError( "Error, no search criterion given" )
-        
-        q = ( f"SELECT o.diaobjectid, o.ra, o.dec, s.psfflux AS srcflux, s.midpointmjdtai AS srct, s.band AS srcband, "
+
+        q = ( f"SELECT o.diaobjectid, o.ra, o.dec, s.psfflux AS srcflux, s.psffluxerr AS srcdflux, "
+              f"       s.midpointmjdtai AS srct, s.band AS srcband "
               f"INTO TEMP TABLE objsearch_sources "
               f"FROM {nexttable} o "
-              f"INNER JOIN diasource s ON o.diaobjectid=s.diaobjectid AND s.processing_version=%(pv)s "
-              f"ORDER BY diaobjectid, srct" )
-        cursor.execute( q, { 'pv': procver } )
-        
-        cursor.execute( "SELECT diaobjectid, ra, dec, COUNT(srcflux) AS ndet, MAX(srcflux) AS maxflux, "
-                        "        LAST(psfflux) AS lastflux, LAST(srcband) AS lastband, LAST(srct) AS lastt "
+              f"INNER JOIN diasource s ON o.diaobjectid=s.diaobjectid AND s.processing_version=%(pv)s " )
+        if statbands is not None:
+            q += "WHERE s.band=ANY(%(bands)s) "
+        q += "ORDER BY diaobjectid, srct"
+        cursor.execute( q, { 'pv': procver, 'bands': statbands } )
+        cursor.execute( "SELECT diaobjectid, ra, dec, COUNT(srcflux) AS ndet, "
+                        "        NULL::real AS maxflux, NULL::real AS maxdflux, "
+                        "        NULL::double precision AS maxfluxt, NULL::character(1) AS maxfluxband, "
+                        "        NULL::real as lastflux, NULL::real AS lastdflux, NULL::character(1) as lastfluxband, "
+                        "        NULL::double precision as lastfluxt "
                         "INTO TEMP TABLE objsearch_srcstats "
                         "FROM objsearch_sources "
                         "GROUP BY diaobjectid, ra, dec" )
+        cursor.execute( "UPDATE objsearch_srcstats oss "
+                        "SET maxflux=subq.srcflux, maxdflux=subq.srcdflux, maxfluxt=subq.srct, "
+                        "    maxfluxband=subq.srcband "
+                        "FROM ( SELECT DISTINCT ON (diaobjectid) diaobjectid, srcflux, srcdflux, srct, srcband "
+                        "       FROM objsearch_sources "
+                        "       ORDER BY diaobjectid, srcflux DESC ) subq "
+                        "WHERE oss.diaobjectid=subq.diaobjectid" )
+        cursor.execute( "UPDATE objsearch_srcstats oss "
+                        "SET lastflux=subq.srcflux, lastdflux=subq.srcdflux, lastfluxt=subq.srct, "
+                        "    lastfluxband=subq.srcband "
+                        "FROM ( SELECT DISTINCT ON (diaobjectid) diaobjectid, srcflux, srcdflux, srct, srcband "
+                        "       FROM objsearch_sources "
+                        "       ORDER BY diaobjectid, srct DESC ) subq "
+                        "WHERE oss.diaobjectid=subq.diaobjectid" )
 
-        cursor.execute( "SELECT t.diaobjectid, t.ra, t.dec, t.ndet, t.maxflux, t.lastflux, t.lastband, t.lastt "
-                        "       f.midpointmjdtai AS frct, f.psfflux AS frcflux, f.psffluxerr AS frcdflux, "
-                        "       f.band AS frcband "
-                        "INTO TEMP TABLE objsearch_forced "
-                        "FROM objsearch_srcstats "
-                        "INNER JOIN diaforcedsource f ON t.diaobjectid=f.diaobjectid AND f.processing_version=%(pv)s "
-                        "ORDER BY diaobjectid, frct",
-                        { 'pv': procver } )
-        cursor.execute( "SELECT diaobjectid, ra, dec, ndet, maxflux, lastflux, lastband, lastt, "
-                        "       LAST(frct) AS lastfrcedt, LAST(frcflux) AS lastfrcflux, "
-                        "       LAST(lastfrcdflux) AS lastfrcdflux, LAST(lastfrband) AS lastfrcband "
-                        "FROM objsearch_forced "
-                        "GROUP BY diaobjectid, ra, dec, ndet, maxflux, lastflux, lastband, lastt" )
+        q = ( "SELECT DISTINCT ON (t.diaobjectid) t.diaobjectid, t.ra, t.dec, t.ndet, "
+              "    t.maxflux AS maxdetflux, t.maxdflux AS maxdetfluxerr, t.maxfluxt AS maxdetfluxmjd, "
+              "    t.maxfluxband as maxdetfluxband, "
+              "    t.lastflux AS lastdetflux, t.lastdflux AS lastdetfluxerr, t.lastfluxt AS lastdetfluxmjd, "
+              "    t.lastfluxband AS lastdetfluxband, "
+              "    f.psfflux AS lastforcedflux, f.psffluxerr AS lastforcedfluxerr, "
+              "    f.midpointmjdtai AS lastforcedfluxmjd, f.band AS lastforcedfluxband "
+              "FROM objsearch_srcstats t "
+              "INNER JOIN diaforcedsource f ON t.diaobjectid=f.diaobjectid AND f.processing_version=%(pv)s " )
+        if statbands is not None:
+            q += "WHERE f.band=ANY(%(bands)s) "
+        q += "ORDER BY t.diaobjectid, f.midpointmjdtai DESC"
+        cursor.execute( q, { 'pv': procver, 'bands': statbands } )
         columns = [ d[0] for d in cursor.description ]
         colummap = { cursor.description[i][0]: i for i in range( len(cursor.description) ) }
         rows = cursor.fetchall()
-        
+
 
     if return_format == 'json':
-        return { c: [ r[ colummap[c] ] ] for c in columns }
+        return { c: [ r[colummap[c]] for r in rows ] for c in columns }
 
     elif return_format == 'pandas':
         return pandas.DataFrame( rows, columns=columns )

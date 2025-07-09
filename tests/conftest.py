@@ -339,6 +339,73 @@ def snana_fits_ppdb_loaded():
             conn.commit()
 
 
+# WARNING -- do not use this fixture together with other fixtures
+#   that affect the diaobject, root_diaboject, diasource, or diaforcedsource tables!!!!
+@pytest.fixture( scope='module' )
+def snana_fits_maintables_loaded_module( procver ):
+    e2td = pathlib.Path( "elasticc2_test_data" )
+    assert e2td.is_dir()
+    dirs = e2td.glob( "*" )
+    dirs = [ d for d in dirs if d.is_dir() ]
+    assert len(dirs) > 0
+
+    try:
+        com = [ "python", "/code/src/admin/load_snana_fits.py",
+                "-n", "5",
+                "-v",
+                "--pv", procver.description,
+                "-d",
+               ]
+        com.extend( dirs )
+        com.append( "--do" )
+
+        logger.info( f"Running a subprocess with command: {com}" )
+        res = subprocess.run( com, capture_output=True )
+        assert res.returncode == 0
+
+        with DB() as dbcon:
+            cursor = dbcon.cursor()
+            cursor.execute( "SELECT COUNT(*) FROM diaobject" )
+            nobj = cursor.fetchone()[0]
+            assert nobj == 346
+            cursor.execute( "SELECT COUNT(*) FROM diasource" )
+            nsrc = cursor.fetchone()[0]
+            assert nsrc == 1862
+            cursor.execute( "SELECT COUNT(*) FROM diaforcedsource" )
+            nfrc = cursor.fetchone()[0]
+            assert nfrc == 52172
+            cursor.execute( "SELECT COUNT(*) FROM host_galaxy" )
+            nhost = cursor.fetchone()[0]
+            assert nhost == 356
+
+            # Build the root diaobject; kind of a hack, but whatever.  Might be slow
+            #   for lots of objects, but our test set is small
+            cursor.execute( "INSERT INTO root_diaobject ( SELECT gen_random_uuid() FROM diaobject )" )
+            dbcon.commit()
+            cursor.execute( "INSERT INTO diaobject_root_map(rootid, diaobjectid, processing_version) "
+                            "SELECT q1.id, q2.diaobjectid, q2.processing_version "
+                            "FROM ( SELECT r.id, ROW_NUMBER() OVER () as rownum "
+                            "       FROM root_diaobject r ) AS q1 "
+                            "INNER JOIN ( SELECT o.diaobjectid, o.processing_version, "
+                            "             ROW_NUMBER() OVER () AS rownum "
+                            "             FROM diaobject o ) AS q2 "
+                            "  ON q1.rownum=q2.rownum" )
+            cursor.execute( "SELECT COUNT(*) FROM root_diaobject" )
+            assert cursor.fetchone()[0] == 346
+            cursor.execute( "SELECT COUNT(*) FROM diaobject_root_map" )
+            assert cursor.fetchone()[0] == 346
+            dbcon.commit()
+
+        yield nobj, nsrc, nfrc, nhost
+
+    finally:
+        with DB() as conn:
+            cursor = conn.cursor()
+            for tab in [ 'root_diaobject', 'host_galaxy', 'diaobject', 'diasource', 'diaforcedsource' ]:
+                cursor.execute( f"TRUNCATE TABLE {tab} CASCADE" )
+            conn.commit()
+
+
 @pytest.fixture
 def mongoclient():
     host = os.getenv( 'MONGODB_HOST' )
