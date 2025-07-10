@@ -1,8 +1,9 @@
 import datetime
 import numbers
 
-import astropy.time
+import numpy
 import pandas
+import astropy.time
 
 import db
 import util
@@ -11,6 +12,11 @@ import util
 def procver_int( processing_version, dbcon=None ):
     if isinstance( processing_version, numbers.Integral ):
         return processing_version
+    try:
+        ipv = int( processing_version )
+        return ipv
+    except Exception:
+        pass
     with db.DB( dbcon ) as con:
         cursor = con.cursor()
         cursor.execute( "SELECT id FROM processing_version WHERE description=%(pv)s", { 'pv': processing_version } )
@@ -23,6 +29,147 @@ def procver_int( processing_version, dbcon=None ):
         if row is None:
             raise ValueError( f"Unknown processing version {processing_version}" )
         return row[0]
+
+
+def object_ltcv( processing_version, diaobjectid, return_format='json', bands=None, which='patch', dbcon=None ):
+    """Get the lightcurve for an object
+
+    Parameters
+    ----------
+       processing_version : int or str
+          The processing verson (or alias) to search
+
+       diaobjectid : int
+          The object id
+
+       return_format : str, default 'json'
+          'json' or 'pandas'
+
+       bands : list of str or None
+          If not None, only include the bands in this list.
+
+       which : str, default 'patch'
+          forced : get forced photometry (i.e. diaforcedsource)
+          detections : get detections (i.e. diasource)
+          patch : get forced photometry, but patch in detections where forced photometry is missing
+
+    Returns
+    -------
+       Either a pandas dataframe, or a json which is a dict of lists.
+       Fields:
+         mjd : float
+         band : str
+         flux : float
+         fluxerr : float
+         isdet : bool (True if this is detected, false otherwise)
+         ispatch : bool (True if this is detected but had no forced photometry, false otherwise;
+                         this field is only present if which='patch'.)
+
+    """
+
+    if which not in ( 'detections', 'forced', 'patch' ):
+        raise ValueError( f"Unknown value of which for object_ltcv: {which}" )
+
+    if return_format not in ( 'json', 'pandas' ):
+        raise ValueError( f"Unknown return_format {return_format}" )
+
+    # Just pull down all sources and forced sources, and do
+    # post-processing in python.  This is going to be hundreds or
+    # thousands of points for a single object, so it's not really
+    # necessary to try to do lots of processing SQL-side to filter stuff
+    # out like we do in get_hot_ltcvs.
+    sources = []
+    forced = []
+    with db.DB( dbcon ) as dbcon:
+        pv = procver_int( processing_version, dbcon=dbcon )
+        cursor = dbcon.cursor()
+        q =  ( "SELECT midpointmjdtai AS mjd, band, psfflux, psffluxerr "
+               "FROM diasource "
+               "WHERE diaobjectid=%(id)s AND processing_version=%(pv)s " )
+        if bands is not None:
+            q += "AND bands=ANY(%(bands)s) "
+        q += "ORDER BY mjd "
+        cursor.execute( q, { 'id': diaobjectid, 'pv': pv, 'bands': bands } )
+        columns = [ d[0] for d in cursor.description ]
+        sources = pandas.DataFrame( cursor.fetchall(), columns=columns )
+        if which in ( 'forced', 'patch' ):
+            q = ( "SELECT midpointmjdtai AS mjd, band, psfflux, psffluxerr "
+                  "FROM diaforcedsource "
+                  "WHERE diaobjectid=%(id)s AND processing_version=%(pv)s " )
+            if bands is not None:
+                q += "AND bands=ANY(%(bands)s) "
+            q += "ORDER BY mjd "
+            cursor.execute( q, { 'id': diaobjectid, 'pv': pv, 'bands': bands } )
+            columns = [ d[0] for d in cursor.description ]
+            forced = pandas.DataFrame( cursor.fetchall(), columns=columns )
+
+    if which == 'detections':
+        # If we're only asking for detections, this is easy
+        retframe = sources
+        retframe['isdet'] = True
+
+    else:
+        # Otherwise, we have to think a lot.  We need to find
+        # corresponences between forced points and source points.  I
+        # don't trust the floating-point MJDs from corresponding rows of
+        # the two tables to be identical (because you should never trust
+        # floating point numbers to be identical), so multiply them by
+        # 10⁴ and convert to bigints for matching purposes.  That gives
+        # a resolution of ~10 seconds; we're making the implicit
+        # assumption that no two exposures will have been taken less
+        # than 10 seconds apart.  Stick my head in the sand re: the edge
+        # case of two corresponding things flooring in different
+        # directions because of floating point underflow.  Going to 4
+        # decimal places = 10 digits of precision (for 5 digits in the
+        # intger part of MJD), and doubles have 15 or 16 digits of
+        # precision, so presumably we're OK, but there may still be a
+        # rare 99999 vs 000000 edge case.
+        #
+        # FUTURE NOTE : we should probably filter on visit and detector
+        # with actual LSST data!  Presumably those will be properly
+        # unique.  And, I think I populate those with SNANA, so maybe
+        # we should just do that now.  That would save us from thinking
+        # about anything floating point for joining.
+
+        forced['mjde4'] = ( forced.mjd * 10000 ).astype( numpy.int64 )
+        sources['mjde4'] = ( sources.mjd * 10000 ).astype( numpy.int64 )
+        forced.set_index( [ 'mjde4', 'band' ], inplace=True )
+        sources.set_index( [ 'mjde4', 'band' ], inplace=True )
+        joined = forced.join( sources, on=[ 'mjde4', 'band' ], how='outer',
+                              lsuffix='_f', rsuffix='_s' ).reset_index()
+        joined['isdet'] = ~joined.mjd_s.isna()
+        joined['ispatch'] = joined.mjd_f.isna()
+
+        if which == 'patch':
+            # Patch in the detections where there is no forced photometry
+            # (Pandas is mysterious; have to use ".loc" to set columns, can't
+            # use the simpler indexing you'd use to read columns.)
+            joined.loc[ joined['ispatch'], 'mjd_f' ] = joined[ joined['ispatch'] ].mjd_s
+            joined.loc[ joined['ispatch'], 'psfflux_f' ] = joined[ joined['ispatch'] ].psfflux_s
+            joined.loc[ joined['ispatch'], 'psffluxerr_f' ] = joined[ joined['ispatch'] ].psffluxerr_s
+
+        # Remove columns that don't have forced or patched photometry
+        joined = joined[ ~joined.mjd_f.isna() ]
+
+        # Remove columns we don't want to return
+        joined.drop( columns=[ 'mjd_s', 'psfflux_s', 'psffluxerr_s', 'mjde4' ], inplace=True )
+        joined.rename( inplace=True, columns={ 'mjd_f': 'mjd',
+                                               'psfflux_f': 'psfflux',
+                                               'psffluxerr_f': 'psffluxerr' } )
+        retframe = joined
+
+    retframe.sort_values( [ 'mjd', 'band' ], inplace=True )
+    if return_format == 'pandas':
+        return retframe
+    elif return_format == 'json':
+        retval = { c: list( joined[c].values ) for c in joined.columns }
+        # Gotta de-bool the bool columns since JSON, sadly, can't handle it
+        retval['isdet'] = [ 1 if r else 0 for r in retval['isdet'] ]
+        if ( 'ispatch' in retval ):
+            retval['ispatch'] = [ 1 if r else 0 for r in retval['ispatch'] ]
+        return retval
+    else:
+        raise RuntimeError( "This should never happen." )
 
 
 def object_search( processing_version, return_format='json', **kwargs ):

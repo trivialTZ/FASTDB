@@ -3,6 +3,7 @@ import { rkAuth } from "./rkauth.js";
 import { rkWebUtil } from "./rkwebutil.js";
 import "./objectsearch.js"
 import "./objectlist.js"
+import "./objectinfo.js"
 
 // **********************************************************************
 // **********************************************************************
@@ -91,10 +92,15 @@ fastdbap.Context = class
         // Main div
         
         this.maindiv = rkWebUtil.elemaker( "div", this.pagebody, { "classes": [ "maindiv" ] } );
-        this.maintabs = new rkWebUtil.Tabbed( this.maindiv, {} );
+        this.maintabs = new rkWebUtil.Tabbed( this.maindiv, { 'tabdivcss': 'maintabdiv',
+                                                              'buttonboxdivcss': 'maintabbuttonbox',
+                                                              'tabcontentdivcss': 'maintabcontentdiv' } );
 
-        this.objectlistdiv = rkWebUtil.elemaker( "div", null, { "classes": [ "maindivtab" ] } );
+        this.objectlistdiv = rkWebUtil.elemaker( "div", null, { "classes": [ "yscroll" ] } );
         this.maintabs.addTab( "objectlist", "Object List", this.objectlistdiv, true );
+
+        this.objectinfodiv = rkWebUtil.elemaker( "div", null, { "classes": [ "maxh100" ] } );
+        this.maintabs.addTab( "objectinfo", "Object Info", this.objectinfodiv, false );
         
     };
 
@@ -143,6 +149,7 @@ fastdbap.Context = class
     object_search_results( data )
     {
         rkWebUtil.wipeDiv( this.objectlistdiv );
+        this.maintabs.selectTab( "objectlist" );
         this.objectlist = new fastdbap.ObjectList( this, this.objectlistdiv );
         this.objectlist.render_page( data );
     }

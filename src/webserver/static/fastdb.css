@@ -93,10 +93,33 @@ div.maindiv { flex-grow: 2;
               margin-top: 1ex;
               padding: 0.5ex;
               border: 2px solid var(--main-color);
+              display: flex;
+              flex-direction: column;
             }
 
-div.maindivtab { overflow-y: scroll; }
+div.maintabdiv { max-height: 100%;
+                 display: flex;
+                 flex-direction: column;
+               }
 
+div.maintabbuttonbox { flex-grow: 0;
+                       flex-shrink: 0;
+                       flex-basis: content;
+                     }
+div.maintabcontentdiv { border: 2px solid var(--mostlyfull-color-border);
+                        padding: 0.5ex;
+                        flex-grow: 1;
+                        display: flex;
+                        flex-direction: column;
+                        max-height: 100%;
+                        min-height: 0;
+                      }
+div.objectinfohbox { display: flex;
+                     flex-direction: row;
+                     min-width: 0;
+                     min-height: 0;
+                     max-height: 100%;
+                   }
 
 /* Generic formatting */
 
@@ -125,7 +148,11 @@ div.maindivtab { overflow-y: scroll; }
 .center { text-align: center }
 .vcenter { vertical-align: middle }
 
+.minwid0 { min-width: 0 }
 .maxwcontent { max-width: fit-content }
+.maxh100 { max-height: 100% }
+.flexgrow0 { flex-grow: 0 }
+.flexgrow1 { flex-grow: 1 }
 .xscroll { overflow-x: scroll }
 .yscroll { overflow-y: scroll }
 
@@ -187,7 +214,7 @@ div.tabcontentdiv { border: 2px solid var(--mostlyfull-color-border);
 table { border: 2px solid var(--full-color-border); border-spacing: 2px }
 table th { border-bottom: 2px solid var(--full-color-border);
            font-weight: bold;
-           border-spoacing: 2px;
+           border-spacing: 2px;
            padding-left: 1ex;
            padding-right: 1ex;
            padding-top: 2px;

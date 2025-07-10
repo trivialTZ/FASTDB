@@ -86,9 +86,12 @@ _sexigesimalre = re.compile( r'^\s*(?P<sign>[\-\+])?\s*(?P<d>[0-9]{0,3})\s*:\s*(
 def parse_sexigesimal( val, deg=True ):  # noqa: E302
     global _sexigesimalre
 
-    match = _sexigesimalre.search( val )
+    try:
+        match = _sexigesimalre.search( val )
+    except Exception:
+        raise ValueError( f"Can't parse {val} (type {type(val)}) as sexigesimal" )
     if match is None:
-        raise ValueError( f"Can't parse {val} as sexigesimal" )
+        raise ValueError( f"Can't parse {val} (type {type(val)}) as sexigesimal" )
     sgn = -1 if match.group('sign') == '-' else 1
     d = int( match.group('d') )
     if ( deg and d >= 360. ) or ( (not deg) and ( d>=24. ) ):

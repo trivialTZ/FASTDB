@@ -1,7 +1,45 @@
 import flask
 
+import db
 import ltcv
 from webserver.baseview import BaseView
+
+
+# ======================================================================
+# /ltcv/getltcv
+
+class GetLtcv( BaseView ):
+    def do_the_things( self, procver, objid ):
+        objid = int( objid )
+        bands = None
+        which = 'patch'
+        if flask.request.is_json:
+            data = flask.request.json
+            unknown = set( data.keys() ) - { 'bands', 'which' }
+            if len(unknown) > 0:
+                raise ValueError( f"Unknown data parameters: {unknown}" )
+            if 'bands' in data:
+                bands = data['bands']
+            if 'which' in data:
+                if data['which'] not in ( 'detections', 'forced', 'patch' ):
+                    raise ValueError( f"Unknown value of which: {which}" )
+                which = data['which']
+
+        with db.DB() as dbcon:
+            cursor = dbcon.cursor()
+            pv = ltcv.procver_int( procver )
+            q = "SELECT * FROM diaobject WHERE diaobjectid=%(id)s AND processing_version=%(pv)s "
+            cursor.execute( q, { 'id': objid, 'pv': pv } )
+            columns = [ d[0] for d in cursor.description ]
+            row = cursor.fetchone()
+            if row is None:
+                raise ValueError( f"Unknown object {objid} in processing version {procver}" )
+            objinfo = { columns[i]: row[i] for i in range(len(columns)) }
+
+            retval = ltcv.object_ltcv( pv, objid, return_format='json', bands=bands, which=which, dbcon=dbcon )
+            retval['objinfo'] = objinfo
+
+            return retval
 
 
 # ======================================================================
@@ -269,6 +307,7 @@ class GetHotTransients( BaseView ):
 bp = flask.Blueprint( 'ltcvapp', __name__, url_prefix='/ltcv' )
 
 urls = {
+    "/getltcv/<procver>/<objid>": GetLtcv,
     "/gethottransients": GetHotTransients
 }
 

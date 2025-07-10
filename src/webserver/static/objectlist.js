@@ -83,7 +83,10 @@ fastdbap.ObjectList = class
             let tr, td;
             tr = rkWebUtil.elemaker( "tr", null );
             let args = {
-                'diaobjectid':        [ "td", tr, { "text": data.diaobjectid[i] } ],
+                'diaobjectid':        [ "td", tr, { "text": data.diaobjectid[i],
+                                                    "classes": [ "link" ],
+                                                    "click": (e) => { self.show_object_info( data.diaobjectid[i] ); }
+                                                  } ],
                 'ra':                 [ "td", tr, { "text": data.ra[i].toFixed(5) } ],
                 'dec':                [ "td", tr, { "text": data.dec[i].toFixed(5) } ],
                 'ndet':               [ "td", tr, { "text": data.ndet[i].toString() } ],
@@ -149,6 +152,28 @@ fastdbap.ObjectList = class
         this.topdiv.appendChild( this.objtable.table );
     }
 
+
+    show_object_info( objid )
+    {
+        let self = this;
+        let pv = this.context.procver_widget.value;
+
+        rkWebUtil.wipeDiv( this.context.objectinfodiv );
+        rkWebUtil.elemaker( "p", this.context.objectinfodiv,
+                            { "text": "Loading object " + objid + " for processing version " + pv,
+                              "classes": [ "warning", "bold", "italic" ] } );
+        this.context.maintabs.selectTab( "objectinfo" );
+        
+        this.context.connector.sendHttpRequest( "/ltcv/getltcv/" + pv + "/" + objid, {},
+                                                (data) => { self.actually_show_object_info( data ) } );
+    }
+
+
+    actually_show_object_info( data )
+    {
+        let info = new fastdbap.ObjectInfo( data, this.context, this.context.objectinfodiv );
+        info.render_page();
+    }
 
 }
 
