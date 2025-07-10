@@ -23,7 +23,7 @@ fastdbap.ObjectSearch = class
 
         // search by diaobject id
         
-        div = rkWebUtil.elemaker( "div", this.topdiv, { "classes": [ "innerdiv", "xmarginright", "maxwcontent" ] } );
+        div = rkWebUtil.elemaker( "div", this.topdiv, { "classes": [ "searchinner", "xmarginright", "maxwcontent" ] } );
         p = rkWebUtil.elemaker( "p", div, { "text": "diaobjectid:" } );
         rkWebUtil.elemaker( "br", p );
         this.diaobjectid_widget = rkWebUtil.elemaker( "input", p, { "attributes": { "size": 10 } } );
@@ -32,7 +32,7 @@ fastdbap.ObjectSearch = class
 
         // search by ra/dec
         
-        div = rkWebUtil.elemaker( "div", this.topdiv, { "classes": [ "innerdiv", "xmarginright", "maxwcontent" ] } );
+        div = rkWebUtil.elemaker( "div", this.topdiv, { "classes": [ "searchinner", "xmarginright", "maxwcontent" ] } );
         table = rkWebUtil.elemaker( "table", div, { "classes": [ "borderless" ] } );
         tr = rkWebUtil.elemaker( "tr", table );
         td = rkWebUtil.elemaker( "td", tr, { "text": "RA:", "classes": [ "right" ] } );
@@ -47,11 +47,34 @@ fastdbap.ObjectSearch = class
         tr = rkWebUtil.elemaker( "tr", table );
         td = rkWebUtil.elemaker( "td", tr, { "text": "radius:", "classes": [ "right" ] } );
         td = rkWebUtil.elemaker( "td", tr );
-        this.dec_widget = rkWebUtil.elemaker( "input", td, { "attributes": { "size": 10 } } );
+        this.radius_widget = rkWebUtil.elemaker( "input", td, { "attributes": { "size": 10 } } );
         rkWebUtil.elemaker( "text", td, { "text": '"' } );
         tr = rkWebUtil.elemaker( "tr", table );
         td = rkWebUtil.elemaker( "td", tr );
-        rkWebUtil.button( td, "Search", (e) => { alert( "Not Implemented" ); } );
+        rkWebUtil.button( td, "Search", (e) => { self.object_search() } );
+    }
+
+
+    object_search()
+    {
+        let self;
+
+        let procver = this.context.procver_widget.value;
+        if ( procver == "—select one —" ) {
+            alert( "Select a processing version to search" );
+            return;
+        }
+
+        let searchcriteria = {};
+        if ( this.ra_widget.value.trim().length > 0 )
+            searchcriteria.ra = this.ra_widget.value.trim;
+        if ( this.dec_widget.value.trim().length > 0 )
+            searchcriteria.dec = this.dec_widget.value.trim;
+        if ( this.radius_widget.value.trim().length > 0 )
+            searchcriteria.radius = this.radius_widget.value.trim;
+        
+        this.context.connector.sendHttpRequest( "/objectsearch/" + procver, searchcriteria,
+                                               (data) => { self.context.object_search_results(data); } );
     }
 }
 

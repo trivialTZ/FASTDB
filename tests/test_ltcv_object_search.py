@@ -49,9 +49,17 @@ def check_df_contents( df, procverid, statbands=None ):
             assert dbrow[3] == row.lastforcedfluxband
 
 
+# The test_user fixture is in this next test not becasue it's needed for
+#   the test, but because this is a convenient test for loading up a
+#   database for use developing the web ap.  In the tests subdirectory,
+#   run:
+#      pytest -v --trace test_ltcv_object_search.py::test_object_search
+#   and wait about a minute for the fixtures to finish.  When you get the (Pdb) prompt,
+#   you're at the beginning of this test.  Let that shell just sit there, and go play
+#   with the web ap.
 
 # This is separated out from test_ltcv.py since it uses a different fixture... at least for now
-def test_object_search( procver, snana_fits_maintables_loaded_module ):
+def test_object_search( procver, test_user, snana_fits_maintables_loaded_module ):
     with pytest.raises( ValueError, match="Unknown search keywords: {'foo'}" ):
         ltcv.object_search( procver.description, foo=5 )
 
@@ -60,7 +68,7 @@ def test_object_search( procver, snana_fits_maintables_loaded_module ):
 
     # Do an absurdly large radial query to see if we get more than one
     jsonresults = ltcv.object_search( procver.description, return_format='json',
-                                      ra=185.4492185, dec=-34.954674, radius=5.3*3600. )
+                                      ra=185.45, dec=-34.95, radius=5.3*3600. )
     assert set( jsonresults.keys() ) == { 'diaobjectid', 'ra', 'dec', 'ndet',
                                           'maxdetflux', 'maxdetfluxerr', 'maxdetfluxmjd', 'maxdetfluxband',
                                           'lastdetflux', 'lastdetfluxerr', 'lastdetfluxmjd', 'lastdetfluxband',
@@ -70,7 +78,7 @@ def test_object_search( procver, snana_fits_maintables_loaded_module ):
 
     # Also get the pandas response, make sure it's the same as json
     results = ltcv.object_search( procver.description, return_format='pandas',
-                                  ra=186.4492185, dec=-34.954674, radius=5.3*3600. )
+                                  ra=185.45, dec=-34.95, radius=5.3*3600. )
     assert len(results) == 3
     assert set( results.columns ) == set( jsonresults.keys() )
     for row in results.itertuples():
@@ -82,7 +90,7 @@ def test_object_search( procver, snana_fits_maintables_loaded_module ):
 
     # Now do a search including only r-band
     resultsr = ltcv.object_search( procver.description, return_format='pandas',
-                                   ra=186.4492185, dec=-34.954674, radius=5.3*3600.,
+                                   ra=185.45, dec=-34.95, radius=5.3*3600.,
                                    statbands='r' )
     assert len(resultsr) == 3
     assert all( r.maxdetfluxband == 'r' for r in resultsr.itertuples() )
@@ -92,7 +100,7 @@ def test_object_search( procver, snana_fits_maintables_loaded_module ):
 
     # Now try r- and g-band
     resultsrg = ltcv.object_search( procver.description, return_format='pandas',
-                                    ra=186.4492185, dec=-34.954674, radius=5.3*3600.,
+                                    ra=185.45, dec=-34.95, radius=5.3*3600.,
                                     statbands=[ 'r', 'g' ] )
     assert len(resultsrg) == 3
     # Because we searched more bands, at least one of the lightcurves should have more detections

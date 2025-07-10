@@ -98,6 +98,9 @@ class ObjectSearch( BaseView ):
             raise TypeError( "POST data was not JSON; send search criteria as a JSON dict" )
         searchdata = flask.request.json
 
+        app.logger.info( dir(db) )
+        app.logger.info( dir(ltcv) )
+        
         return ltcv.object_search( processing_version, return_format='json', **searchdata )
 
 
@@ -149,6 +152,7 @@ urls = {
     "/": MainPage,
     "/getprocvers": GetProcVers,
     "/count/<which>/<procver>": CountThings,
+    "/objectsearch/<processing_version>": ObjectSearch
 }
 
 usedurls = {}

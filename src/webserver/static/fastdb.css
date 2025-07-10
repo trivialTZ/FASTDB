@@ -81,6 +81,12 @@ div.searchbox { flex-basis: content;
                 padding: 0.5ex;
               }
 
+/* searchinner is a thing inside the search box */
+div.searchinner { flex-basis: content;
+                  border: 2px solid var(--mid-color-border);
+                  padding: 0.5ex;
+                }
+
 div.maindiv { flex-grow: 2;
               flex-shrink: 1;
               min-height: 0;
@@ -194,6 +200,7 @@ table.borderedcells tr td { padding-left: 1ex;
                             border-left: 1px solid var(--half-faded-color); }
 
 tr.greybg { background: var(--lots-faded-color); }
+tr.whitebg { background: var(--background-color); }
 
 table.exposurelist td { border: 2px solid var(--half-faded-color); }
 tr.heldexposure { font-style: italic; color: var(--some-faded-color); }
