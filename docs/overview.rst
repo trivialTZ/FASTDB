@@ -11,3 +11,5 @@ While there will be an interactive UI on the webserver, the primary way you conn
 To use a FASTDB instance, you must have an account on it.  At the moment, Rob is not setting up general users on any of the test installs, but hopefully that will change relatively soon.
 
 Contact Rob to ask for an account; he will need the username you want, and the email you want associated with it.  When first created, your account will no thave a password.  Point your web browser at the webserver's URL, and you will see an option to request a password reset link.
+
+For developers wanting to set up a test installation on their own machine, see :doc:`developers`.
