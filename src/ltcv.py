@@ -26,7 +26,7 @@ def procver_int( processing_version, dbcon=None ):
 
 
 def object_search( processing_version, return_format='json', **kwargs ):
-    util.logger.info( f"In object_search : kwargs = {kwargs}" )
+    util.logger.debug( f"In object_search : kwargs = {kwargs}" )
     knownargs = { 'ra', 'dec', 'radius',
                   'mint_firstdetection', 'maxt_firstdetection',
                   'mint_lastdetection', 'maxt_lastdetection'

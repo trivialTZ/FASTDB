@@ -57,7 +57,7 @@ fastdbap.ObjectSearch = class
 
     object_search()
     {
-        let self;
+        let self = this;
 
         let procver = this.context.procver_widget.value;
         if ( procver == "—select one —" ) {
@@ -67,11 +67,11 @@ fastdbap.ObjectSearch = class
 
         let searchcriteria = {};
         if ( this.ra_widget.value.trim().length > 0 )
-            searchcriteria.ra = this.ra_widget.value.trim;
+            searchcriteria.ra = this.ra_widget.value.trim();
         if ( this.dec_widget.value.trim().length > 0 )
-            searchcriteria.dec = this.dec_widget.value.trim;
+            searchcriteria.dec = this.dec_widget.value.trim();
         if ( this.radius_widget.value.trim().length > 0 )
-            searchcriteria.radius = this.radius_widget.value.trim;
+            searchcriteria.radius = this.radius_widget.value.trim();
         
         this.context.connector.sendHttpRequest( "/objectsearch/" + procver, searchcriteria,
                                                (data) => { self.context.object_search_results(data); } );

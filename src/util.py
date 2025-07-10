@@ -110,10 +110,10 @@ def float_or_none_from_dict_float_or_dms( d, kw ):
     if isinstance( d[kw], str ) and ( len( d[kw].strip() ) == 0 ):
         return None
 
-    if isinstance( d[kw], numbers.Real ):
+    try:
+        return parse_sexigesimal( d[kw], deg=True )
+    except ValueError:
         return float( d[kw] )
-
-    return parse_sexigesimal( d[kw], deg=True )
 
 
 def float_or_none_from_dict_float_or_hms( d, kw ):
@@ -123,10 +123,13 @@ def float_or_none_from_dict_float_or_hms( d, kw ):
     if isinstance( d[kw], str ) and ( len( d[kw].strip() ) == 0 ):
         return None
 
-    if isinstance( d[kw], numbers.Real ):
+    try:
+        return 15. * parse_sexigesimal( d[kw], deg=False )
+    except ValueError:
         return float( d[kw] )
 
-    return 15. * parse_sexigesimal( d[kw], deg=False )
+    if isinstance( d[kw], numbers.Real ):
+        return float( d[kw] )
 
 
 def get_alert_schema( schemadir=None ):

@@ -143,8 +143,8 @@ fastdbap.Context = class
     object_search_results( data )
     {
         rkWebUtil.wipeDiv( this.objectlistdiv );
-        this.objectlist = new fastdb.ObjectList( this, this.objectlistdiv );
-        this.objectlist.render_page();
+        this.objectlist = new fastdbap.ObjectList( this, this.objectlistdiv );
+        this.objectlist.render_page( data );
     }
 }
 

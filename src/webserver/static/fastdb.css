@@ -185,7 +185,14 @@ div.tabcontentdiv { border: 2px solid var(--mostlyfull-color-border);
 /* Table formatting options */
 
 table { border: 2px solid var(--full-color-border); border-spacing: 2px }
-table th { border-bottom: 2px solid var(--full-color-border); font-weight: bold }
+table th { border-bottom: 2px solid var(--full-color-border);
+           font-weight: bold;
+           border-spoacing: 2px;
+           padding-left: 1ex;
+           padding-right: 1ex;
+           padding-top: 2px;
+           padding-bottom: 2px;
+         }
 table td { border-bottom: 2px solid var(--half-faded-color);
            border-spacing: 2px;
            padding-left: 1ex;
@@ -194,6 +201,7 @@ table td { border-bottom: 2px solid var(--half-faded-color);
            padding-bottom: 2px;
          }
 table th.borderleft { border-left: 2px solid var(--half-faded-color); }
+table td.borderleft { border-left: 2px solid var(--half-faded-color); }
 
 table.borderedcells tr td { padding-left: 1ex;
                             padding-right: 1ex;

@@ -16,6 +16,7 @@ fastdbap.ObjectList = class
     render_page( data )
     {
         let self = this;
+        let tr;
 
         // Calculate magnitudes assuming zp=31.4 (flux is nJy)
         data[ 'magmax' ] = []
@@ -26,8 +27,8 @@ fastdbap.ObjectList = class
         data[ 'magforcedlasterr' ] = []
         for ( let i in data.diaobjectid ) {
             if ( data.maxdetflux[i] > 0 ) {
-                data.magmax.push( -2.5 * Math.log10( data.magdetflux[i] ) + 31.4 );
-                data.magmaxerr.push( 2.5 / Math.log(10.) * data.magdetfluxerr[i] / data.magdetflux[i] );
+                data.magmax.push( -2.5 * Math.log10( data.maxdetflux[i] ) + 31.4 );
+                data.magmaxerr.push( 2.5 / Math.log(10.) * data.maxdetfluxerr[i] / data.maxdetflux[i] );
             } else {
                 data.magmax.push( -99 );
                 data.magmaxerr.push( -99 );
@@ -42,58 +43,113 @@ fastdbap.ObjectList = class
             if ( data.lastforcedflux[i] > 0 ) {
                 data.magforcedlast.push( -2.5 * Math.log10( data.lastforcedflux[i] ) + 31.4 );
                 data.magforcedlasterr.push( 2.5 / Math.log(10.) * data.lastforcedfluxerr[i] / data.lastforcedflux[i] );
+            } else {
+                data.magforcedlast.push( -99 );
+                data.magforcedlasterr.push( -99 );
             }
         }
 
-        let fields = [ 'diaobjectid', 'ra', 'dec', 'ndet', 'mjd_n', 'band_n', 'mag_n', 'dmag_n',
-                       'mjd_^', 'band_^', 'mag_^', 'dmag_^', 'mjd_fn', 'band_fn', 'mag_fn', 'dmag_fn' ]
-        let fieldmap = { 'diaobjectid': 'diaobjectid',
-                         'ra': 'ra',
-                         'dec': 'dec',
-                         'ndet': 'ndet',
-                         'mjd_n': 'lastdetfluxmjd',
-                         'band_n': 'lastdetfluxband',
-                         'mag_n': 'maglast',
-                         'dmag_n': 'maglasterr',
-                         'mjd_^': 'maxdetfluxmjd',
-                         'band_^': 'maxdetfluxband',
-                         'mag_^': 'magmax',
-                         'dmag_^': 'magmaxerr',
-                         'mjd_fn': 'lastforcedfluxmjd',
-                         'band_fn': 'lastforcedfluxband',
-                         'mag_fn': 'magforcedlast',
-                         'dmag_fn': 'magforcedlasterr' }
-        
-        let rowrenderer = function( data, i ) {
+        let fields = [ 'diaobjectid',
+                       'ra',
+                       'dec',
+                       'ndet',
+                       'lastdetfluxmjd',
+                       'lastdetfluxband',
+                       'maglast',
+                       'maglasterr',
+                       'maxdetfluxmjd',
+                       'maxdetfluxband',
+                       'magmax',
+                       'magmaxerr',
+                       'lastforcedfluxmjd',
+                       'lastforcedfluxband',
+                       'magforcedlast',
+                       'magforcedlasterr' ]
+        let hdrs = { 'lastdetfluxmjd': 'mjd',
+                     'lastdetfluxband': 'band',
+                     'maglast': 'mag',
+                     'maglasterr': 'dmag',
+                     'maxdetfluxmjd': 'mjd',
+                     'maxdetfluxband': 'band',
+                     'magmax': 'mag',
+                     'magmaxerr': 'dmag',
+                     'lastforcedfluxmjd': 'mjd',
+                     'lastforcedfluxband': 'band',
+                     'magforcedlast': 'mag',
+                     'magforcedlasterr': 'dmag' }
+
+
+        let rowrenderer = function( data, fields, i ) {
             let tr, td;
-            tr = rkWebUtil.elemaker( tr, null );
-            td = rkWebUtil.elemaker( td, tr, { "text": data.ra[i].toFixed(5) } );
-            td = rkWebUtil.elemaker( td, tr, { "text": data.dec[i].toFixed(5) } );
-            td = rkWebUtil.elemaker( td, tr, { "text": data.ndet[i].toString() } );
-            td = rkWebUtil.elemaker( td, tr, { "text": data.lastdetfluxmjd[i].toFixed(2) } );
-            td = rkWebUtil.elemaker( td, tr, { "text": data.lastdetfluxband[i] } );
-            td = rkWebUtil.elemaker( td, tr, { "text": data.maglast[i].toFixed(2) } );
-            td = rkWebUtil.elemaker( td, tr, { "text": data.maglasterr[i].toFixed(2) } );
-            td = rkWebUtil.elemaker( td, tr, { "text": data.maxdetfluxmjd[i].toFixed(2) } );
-            td = rkWebUtil.elemaker( td, tr, { "text": data.maxdetfluxband[i] } );
-            td = rkWebUtil.elemaker( td, tr, { "text": data.magmax[i].toFixed(2) } );
-            td = rkWebUtil.elemaker( td, tr, { "text": data.magmaxerr[i].toFixed(2) } );
-            td = rkWebUtil.elemaker( td, tr, { "text": data.lastforcedfluxmjd[i].toFixed(2) } );
-            td = rkWebUtil.elemaker( td, tr, { "text": data.lastforcedfluxband[i] } );
-            td = rkWebUtil.elemaker( td, tr, { "text": data.magforcedlast[i].toFixed(2) } );
-            td = rkWebUtil.elemaker( td, tr, { "text": data.magforcedlasterr[i].toFixed(2) } );
+            tr = rkWebUtil.elemaker( "tr", null );
+            let args = {
+                'diaobjectid':        [ "td", tr, { "text": data.diaobjectid[i] } ],
+                'ra':                 [ "td", tr, { "text": data.ra[i].toFixed(5) } ],
+                'dec':                [ "td", tr, { "text": data.dec[i].toFixed(5) } ],
+                'ndet':               [ "td", tr, { "text": data.ndet[i].toString() } ],
+                'lastdetfluxmjd':     [ "td", tr, { "text": data.lastdetfluxmjd[i].toFixed(2),
+                                                    "classes": [ "borderleft" ] } ],
+                'lastdetfluxband':    [ "td", tr, { "text": data.lastdetfluxband[i] } ],
+                'maglast':            [ "td", tr, { "text": data.maglast[i].toFixed(2) } ],
+                'maglasterr':         [ "td", tr, { "text": data.maglasterr[i].toFixed(2) } ],
+                'maxdetfluxmjd':      [ "td", tr, { "text": data.maxdetfluxmjd[i].toFixed(2),
+                                                    "classes": [ "borderleft" ] } ],
+                'maxdetfluxband':     [ "td", tr, { "text": data.maxdetfluxband[i] } ],
+                'magmax':             [ "td", tr, { "text": data.magmax[i].toFixed(2) } ],
+                'magmaxerr':          [ "td", tr, { "text": data.magmaxerr[i].toFixed(2) } ],
+                'lastforcedfluxmjd':  [ "td", tr, { "text": data.lastforcedfluxmjd[i].toFixed(2),
+                                                    "classes": [ "borderleft" ] } ],
+                'lastforcedfluxband': [ "td", tr, { "text": data.lastforcedfluxband[i] } ],
+                'magforcedlast':      [ "td", tr, { "text": data.magforcedlast[i].toFixed(2) } ],
+                'magforcedlasterr':   [ "td", tr, { "text": data.magforcedlasterr[i].toFixed(2) } ]
+            }
+            for ( let f of fields ) {
+                if ( ! args.hasOwnProperty( f ) ) {
+                    console.log( "ERROR: unknown field " + f + "; you should never see this!" )
+                    continue;
+                }
+                td = rkWebUtil.elemaker.apply( null, args[f] );
+            }
             return tr;
         }
 
-        this.objtable = rkWebUtil.SortableTable( data, rowrender, fields, { 'fieldmap': fieldmap,
-                                                                            'dictoflists': true,
-                                                                            'colorclasses': [ 'whitebg', 'greybg' ],
-                                                                            'colrolength' : 3 } );
+        let headercallback = function( table, ths ) {
+            ths[4].classList.add( "borderleft" );
+            ths[8].classList.add( "borderleft" );
+            ths[12].classList.add( "borderleft" );
+            let tr = rkWebUtil.elemaker( "tr", null );
+            rkWebUtil.elemaker( "th", tr, { "text": "",
+                                            "attributes": { "colspan": 4 },
+                                            "classes": [ "borderleft" ] } );
+            rkWebUtil.elemaker( "th", tr, { "text": "Last Detection",
+                                            "attributes": { "colspan": 4 },
+                                            "classes": [ "borderleft" ] } );
+            rkWebUtil.elemaker( "th", tr, { "text": "Max Detection",
+                                            "attributes": { "colspan": 4 },
+                                            "classes": [ "borderleft" ] } );
+            rkWebUtil.elemaker( "th", tr, { "text": "Last Forced",
+                                            "attributes": { "colspan": 4 },
+                                            "classes": [ "borderleft" ] } );
+            table.prepend( tr );
+        }
+
+        this.objtable = new rkWebUtil.SortableTable(
+            data,
+            fields,
+            rowrenderer,
+            { 'dictoflists': true,
+              'hdrs': hdrs,
+              'colorclasses': [ 'whitebg', 'greybg' ],
+              'colorlength' : 3,
+              'headercallback': headercallback
+            }
+        );
+
         // TODO: info about search criteria
-        this.topdiv.appendChild( thisobjtable );
+        this.topdiv.appendChild( this.objtable.table );
     }
 
-    
+
 }
 
 // **********************************************************************
