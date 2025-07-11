@@ -31,7 +31,7 @@ fastdbap.ObjectInfo = class
                           'g': '#0000cc',
                           'r': '#00cc00',
                           'i': '#cc0000',
-                          'z': '#cc4400',
+                          'z': '#888800',
                           'Y': '#884400'
                         };
         let othercolors = [ '#444400', '#440044', '#004444' ];
@@ -40,8 +40,6 @@ fastdbap.ObjectInfo = class
         // Extract the data into svgplot datasets
         this.ltcvs = {}
 
-        this.minmjd = 1e32;
-        this.maxmjd = -1e32;
         let unknownbands = [];
         for ( let i in data.mjd ) {
             if ( ! this.ltcvs.hasOwnProperty( data.band[i] ) ) {
@@ -79,14 +77,7 @@ fastdbap.ObjectInfo = class
                 this.ltcvs[data.band[i]].max = data.psfflux[i];
             if ( data.psfflux[i] < this.ltcvs[data.band[i]].min )
                 this.ltcvs[data.band[i]].min = data.psfflux[i];
-            if ( data.mjd[i] > this.maxmjd )
-                this.maxmjd = data.mjd[i];
-            if ( data.mjd[i] < this.minmjd )
-                this.minmjd = data.mjd[i];
         }
-        let dmjd = this.maxmjd - this.minmjd;
-        this.minmjd -= 0.05 * dmjd;
-        this.maxmjd += 0.05 * dmjd;
 
         this.allbands = [];
         for ( let b of knownbands ) if ( this.ltcvs.hasOwnProperty( b ) ) this.allbands.push( b );
@@ -234,6 +225,17 @@ fastdbap.ObjectInfo = class
         rkWebUtil.elemaker( "option", this.ltcv_yscale_widget, { "value": "relative",
                                                                  "text": "relative" } )
 
+
+        rkWebUtil.elemaker( "text", p, { "text": "   " } );
+        this.show_nondet = true;
+        this.show_nondet_checkbox = rkWebUtil.elemaker( "input", p,
+                                                        { "id": "show-nondetections-checkbox",
+                                                          "change": (e) => { self.update_ltcv_display() },
+                                                          "attributes": { "type": "checkbox",
+                                                                          "checked": 1 } } );
+        rkWebUtil.elemaker( "label", p, { "text": "Show nondetections",
+                                          "attributes": { "for": "show-nondetections-checkbox" } } );
+
         this.colorcheckboxp = rkWebUtil.elemaker( "p", ltcvdiv );
 
         this.ltcvs_div = rkWebUtil.elemaker( "div", ltcvdiv );
@@ -253,6 +255,17 @@ fastdbap.ObjectInfo = class
         if ( this.ltcv_yscale_widget.value != this.current_ltcv_yscale ) {
             this.current_ltcv_yscale = this.ltcv_yscale_widget.value;
             mustchange = true;
+        }
+        if ( this.show_nondet_checkbox.checked ) {
+            if ( ! this.show_nondet ) {
+                this.show_nondet = true;
+                mustchange = true;
+            }
+        } else {
+            if ( this.show_nondet ) {
+                this.show_nondet = false;
+                mustchange = true;
+            }
         }
         let newshow = [];
         for ( let b of this.allbands ) {
@@ -275,6 +288,10 @@ fastdbap.ObjectInfo = class
 
         rkWebUtil.wipeDiv( this.ltcvs_div );
 
+        let minmaxmjd = this.get_min_max_mjd()
+        let minmjd = minmaxmjd.min - 0.05 * ( minmaxmjd.max - minmaxmjd.min );
+        let maxmjd = minmaxmjd.max + 0.05 * ( minmaxmjd.max - minmaxmjd.min );
+
         let ytitle = "flux (nJy)";
         if ( this.current_ltcv_yscale == 'relative' ) ytitle = "flux (rel.)";
 
@@ -285,16 +302,17 @@ fastdbap.ObjectInfo = class
                                            "title": null,
                                            "xtitle": "MJD",
                                            "ytitle": ytitle,
-                                           "defaultlimits": [ this.minmjd, this.maxmjd, null, null ],
+                                           "defaultlimits": [ minmjd, maxmjd, null, null ],
+                                           "nosuppresszeroy": true,
                                            "zoommode": "default"
                                          } );
             for ( let b of this.shownbands ) {
                 if ( this.current_ltcv_yscale == 'relative' ) {
                     plot.addDataset( this.datasets[b].rel.detected );
-                    plot.addDataset( this.datasets[b].rel.undetected );
+                    if ( this.snow_nondet ) plot.addDataset( this.datasets[b].rel.undetected );
                 } else {
                     plot.addDataset( this.datasets[b].abs.detected );
-                    plot.addDataset( this.datasets[b].abs.undetected );
+                    if ( this.show_nondet ) plot.addDataset( this.datasets[b].abs.undetected );
                 }
             }
             this.ltcvs_div.appendChild( plot.topdiv );
@@ -308,14 +326,15 @@ fastdbap.ObjectInfo = class
                                                "xtitle": "MJD",
                                                "ytitle": ytitle,
                                                "defaultlimits": [ this.minmjd, this.maxmjd, null, null ],
+                                               "nosuppresszeroy": true,
                                                "zoommode": "default"
                                              } );
                 if ( this.current_ltcv_yscale == 'relative' ) {
                     plot.addDataset( this.datasets[b].rel.detected );
-                    plot.addDataset( this.datasets[b].rel.undetected );
+                    if ( this.show_nondet ) plot.addDataset( this.datasets[b].rel.undetected );
                 } else {
                     plot.addDataset( this.datasets[b].abs.detected );
-                    plot.addDataset( this.datasets[b].abs.undetected );
+                    if ( this.show_nondet ) plot.addDataset( this.datasets[b].abs.undetected );
                 }
                 this.ltcvs_div.appendChild( plot.topdiv );
             }
@@ -365,6 +384,23 @@ fastdbap.ObjectInfo = class
             this.band_checkboxes[b] = checkbox;
         }
 
+    }
+
+    get_min_max_mjd()
+    {
+        if ( this.data.mjd.length == 0 ) return { 'min': 60000., 'max': 60001. };
+
+        let minmjd = 1e32;
+        let maxmjd = -1e32;
+        for ( let i in this.data.mjd ) {
+            if ( this.shownbands.includes( this.data.band[i] ) ) {
+                if ( this.data.isdet[i] || this.show_nondet ) {
+                    if ( this.data.mjd[i] < minmjd ) minmjd = this.data.mjd[i];
+                    if ( this.data.mjd[i] > maxmjd ) maxmjd = this.data.mjd[i];
+                }
+            }
+        }
+        return { 'min': minmjd, 'max': maxmjd };
     }
 
 }
