@@ -22,16 +22,16 @@ fastdbap.ObjectSearch = class
         rkWebUtil.wipeDiv( this.topdiv );
 
         // search by diaobject id
-        
+
         div = rkWebUtil.elemaker( "div", this.topdiv, { "classes": [ "searchinner", "xmarginright", "maxwcontent" ] } );
         p = rkWebUtil.elemaker( "p", div, { "text": "diaobjectid:" } );
         rkWebUtil.elemaker( "br", p );
         this.diaobjectid_widget = rkWebUtil.elemaker( "input", p, { "attributes": { "size": 10 } } );
         rkWebUtil.elemaker( "br", p );
-        rkWebUtil.button( p, "Show", (e) => { alert("Not Implemented" ); } );
+        rkWebUtil.button( p, "Show", (e) => { self.show_object_info(); } );
 
         // search by ra/dec
-        
+
         div = rkWebUtil.elemaker( "div", this.topdiv, { "classes": [ "searchinner", "xmarginright", "maxwcontent" ] } );
         table = rkWebUtil.elemaker( "table", div, { "classes": [ "borderless" ] } );
         tr = rkWebUtil.elemaker( "tr", table );
@@ -72,10 +72,34 @@ fastdbap.ObjectSearch = class
             searchcriteria.dec = this.dec_widget.value.trim();
         if ( this.radius_widget.value.trim().length > 0 )
             searchcriteria.radius = this.radius_widget.value.trim();
-        
+
         this.context.connector.sendHttpRequest( "/objectsearch/" + procver, searchcriteria,
                                                (data) => { self.context.object_search_results(data); } );
     }
+
+
+    show_object_info()
+    {
+        let self = this;
+        let objid = this.diaobjectid_widget.value;
+        let pv = this.context.procver_widget.value;
+
+        rkWebUtil.wipeDiv( this.context.objectinfodiv );
+        rkWebUtil.elemaker( "p", this.context.objectinfodiv,
+                            { "text": "Loading object " + objid + " for processing version " + pv,
+                              "classes": [ "warning", "bold", "italic" ] } );
+        this.context.maintabs.selectTab( "objectinfo" );
+
+        this.context.connector.sendHttpRequest( "/ltcv/getltcv/" + pv + "/" + objid, {},
+                                                (data) => { self.actually_show_object_info( data ) } );
+    }
+
+    actually_show_object_info( data )
+    {
+        let info = new fastdbap.ObjectInfo( data, this.context, this.context.objectinfodiv );
+        info.render_page();
+    }
+
 }
 
 // **********************************************************************

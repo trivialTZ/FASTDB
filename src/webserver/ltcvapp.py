@@ -38,6 +38,7 @@ class GetLtcv( BaseView ):
 
             retval = ltcv.object_ltcv( pv, objid, return_format='json', bands=bands, which=which, dbcon=dbcon )
             retval['objinfo'] = objinfo
+            retval['objinfo']['processing_version'] = f"{procver} ({retval['objinfo']['processing_version']})"
 
             return retval
 
