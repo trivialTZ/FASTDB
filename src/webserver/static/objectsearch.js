@@ -29,6 +29,8 @@ fastdbap.ObjectSearch = class
         this.diaobjectid_widget = rkWebUtil.elemaker( "input", p, { "attributes": { "size": 10 } } );
         rkWebUtil.elemaker( "br", p );
         rkWebUtil.button( p, "Show", (e) => { self.show_object_info(); } );
+        p = rkWebUtil.elemaker( "p", div );
+        rkWebUtil.button( p, "Show Random Obj", (e) => { self.show_random_obj(); } );
 
         // search by ra/dec
 
@@ -91,6 +93,21 @@ fastdbap.ObjectSearch = class
         this.context.maintabs.selectTab( "objectinfo" );
 
         this.context.connector.sendHttpRequest( "/ltcv/getltcv/" + pv + "/" + objid, {},
+                                                (data) => { self.actually_show_object_info( data ) } );
+    }
+
+    show_random_obj()
+    {
+        let self = this;
+        let pv = this.context.procver_widget.value;
+
+        rkWebUtil.wipeDiv( this.context.objectinfodiv );
+        rkWebUtil.elemaker( "p", this.context.objectinfodiv,
+                            { "text": "Loading random object for processing version " + pv,
+                              "classes": [ "warning", "bold", "italic" ] } );
+        this.context.maintabs.selectTab( "objectinfo" )
+
+        this.context.connector.sendHttpRequest( "/ltcv/getrandomltcv/" + pv, {},
                                                 (data) => { self.actually_show_object_info( data ) } );
     }
 

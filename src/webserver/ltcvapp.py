@@ -9,8 +9,7 @@ from webserver.baseview import BaseView
 # /ltcv/getltcv
 
 class GetLtcv( BaseView ):
-    def do_the_things( self, procver, objid ):
-        objid = int( objid )
+    def get_ltcv( self, procver, procverint, objid, dbcon=None ):
         bands = None
         which = 'patch'
         if flask.request.is_json:
@@ -25,22 +24,44 @@ class GetLtcv( BaseView ):
                     raise ValueError( f"Unknown value of which: {which}" )
                 which = data['which']
 
-        with db.DB() as dbcon:
+        with db.DB( dbcon ) as dbcon:
             cursor = dbcon.cursor()
-            pv = ltcv.procver_int( procver )
             q = "SELECT * FROM diaobject WHERE diaobjectid=%(id)s AND processing_version=%(pv)s "
-            cursor.execute( q, { 'id': objid, 'pv': pv } )
+            cursor.execute( q, { 'id': objid, 'pv': procverint } )
             columns = [ d[0] for d in cursor.description ]
             row = cursor.fetchone()
             if row is None:
                 raise ValueError( f"Unknown object {objid} in processing version {procver}" )
             objinfo = { columns[i]: row[i] for i in range(len(columns)) }
 
-            retval = ltcv.object_ltcv( pv, objid, return_format='json', bands=bands, which=which, dbcon=dbcon )
+            retval = ltcv.object_ltcv( procverint, objid, return_format='json', bands=bands, which=which, dbcon=dbcon )
             retval['objinfo'] = objinfo
             retval['objinfo']['processing_version'] = f"{procver} ({retval['objinfo']['processing_version']})"
 
             return retval
+
+    def do_the_things( self, procver, objid ):
+        with db.DB() as dbcon:
+            objid = int( objid )
+            pv = ltcv.procver_int( procver )
+            return self.get_ltcv( procver, pv, objid, dbcon=dbcon )
+
+
+# ======================================================================
+# /ltcv/getrandomltcv
+
+class GetRandomLtcv( GetLtcv ):
+    def do_the_things( self, procver ):
+        with db.DB() as dbcon:
+            pv = ltcv.procver_int( procver )
+            cursor = dbcon.cursor()
+            # THINK ; this may be slow, as it may sort the entire object table!  Or at least the index.
+            # TABLESAMPLE may be a solution, but it doesn't interact with WHERE
+            #   the way I'd want it to.
+            cursor.execute( "SELECT diaobjectid FROM diaobject WHERE processing_version=%(pv)s "
+                            "ORDER BY random() LIMIT 1", { 'pv': pv } )
+            objid = cursor.fetchone()[0]
+            return self.get_ltcv( procver, pv, objid, dbcon=dbcon )
 
 
 # ======================================================================
@@ -309,6 +330,7 @@ bp = flask.Blueprint( 'ltcvapp', __name__, url_prefix='/ltcv' )
 
 urls = {
     "/getltcv/<procver>/<objid>": GetLtcv,
+    "/getrandomltcv/<procver>": GetRandomLtcv,
     "/gethottransients": GetHotTransients
 }
 
