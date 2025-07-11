@@ -8,7 +8,7 @@ import { SVGPlot } from "./svgplot.js"
 
 fastdbap.ObjectInfo = class
 {
-    constructor( data, context, parentdiv ) 
+    constructor( data, context, parentdiv )
     {
         this.data = data;
         this.context = context;
@@ -18,7 +18,7 @@ fastdbap.ObjectInfo = class
         for ( let i in this.data.psfflux ) {
             this.data['s/n'].push( this.data.psfflux[i] / this.data.psffluxerr[i] );
         }
-        
+
         let knownbands = [ 'u', 'g', 'r', 'i', 'z', 'Y' ];
         let markerdict = { 'u': [ 'dot', 'circle' ],
                            'g': [ 'filledsquare', 'square' ],
@@ -36,7 +36,7 @@ fastdbap.ObjectInfo = class
                         };
         let othercolors = [ '#444400', '#440044', '#004444' ];
         let otherdex = 0;
-        
+
         // Extract the data into svgplot datasets
         this.ltcvs = {}
 
@@ -68,7 +68,7 @@ fastdbap.ObjectInfo = class
                     otherdex += 1;
                     if ( otherdex >= othercolors.length ) otherdex = 0;
                 }
-                                                                       
+
             }
             let which = 'undetected';
             if ( data.isdet[i] ) which = "detected";
@@ -91,12 +91,13 @@ fastdbap.ObjectInfo = class
         this.allbands = [];
         for ( let b of knownbands ) if ( this.ltcvs.hasOwnProperty( b ) ) this.allbands.push( b );
         this.allbands = this.allbands.concat( unknownbands );
+        this.shownbands = [...this.allbands];
 
         this.datasets = {};
         for ( let b of this.allbands ) {
             let curset = { 'rel': { 'detected': null, 'undetected': null },
                            'abs': { 'detected': null, 'undetected': null } };
-            curset.abs.detected = new SVGPlot.Dataset( { 'name': b,
+            curset.abs.detected = new SVGPlot.Dataset( { 'caption': b,
                                                          'x': this.ltcvs[b].detected.mjd,
                                                          'y': this.ltcvs[b].detected.flux,
                                                          'dy': this.ltcvs[b].detected.dflux,
@@ -104,8 +105,7 @@ fastdbap.ObjectInfo = class
                                                          'linewid': 0,
                                                          'color': this.ltcvs[b].color
                                                        } )
-            curset.abs.undetected = new SVGPlot.Dataset( { 'name': b,
-                                                           'x': this.ltcvs[b].undetected.mjd,
+            curset.abs.undetected = new SVGPlot.Dataset( { 'x': this.ltcvs[b].undetected.mjd,
                                                            'y': this.ltcvs[b].undetected.flux,
                                                            'dy': this.ltcvs[b].undetected.flux,
                                                            'marker': this.ltcvs[b].nondetmarker,
@@ -116,15 +116,15 @@ fastdbap.ObjectInfo = class
             let detreldy = [];
             for ( let i in this.ltcvs[b].detected.flux ) {
                 detrely.push( this.ltcvs[b].detected.flux[i] / this.ltcvs[b].max );
-                detreldy.push( this.ltcvs[b].detected.flux[i] / this.ltcvs[b].max );
+                detreldy.push( this.ltcvs[b].detected.dflux[i] / this.ltcvs[b].max );
             }
             let nondetrely = [];
             let nondetreldy = [];
             for ( let i in this.ltcvs[b].undetected.flux ) {
                 nondetrely.push( this.ltcvs[b].undetected.flux[i] / this.ltcvs[b].max );
-                nondetreldy.push( this.ltcvs[b].undetected.flux[i] / this.ltcvs[b].max );
+                nondetreldy.push( this.ltcvs[b].undetected.dflux[i] / this.ltcvs[b].max );
             }
-            curset.rel.detected = new SVGPlot.Dataset( { 'name': b,
+            curset.rel.detected = new SVGPlot.Dataset( { 'caption': b,
                                                          'x': this.ltcvs[b].detected.mjd,
                                                          'y': detrely,
                                                          'dy': detreldy,
@@ -132,8 +132,7 @@ fastdbap.ObjectInfo = class
                                                          'linewid': 0,
                                                          'color': this.ltcvs[b].color
                                                        } )
-            curset.rel.undetected = new SVGPlot.Dataset( { 'name': b,
-                                                           'x': this.ltcvs[b].undetected.mjd,
+            curset.rel.undetected = new SVGPlot.Dataset( { 'x': this.ltcvs[b].undetected.mjd,
                                                            'y': nondetrely,
                                                            'dy': nondetreldy,
                                                            'marker': this.ltcvs[b].nondetmarker,
@@ -148,7 +147,7 @@ fastdbap.ObjectInfo = class
     {
         let self = this;
         let topdiv, infodiv, ltcvdiv, table, tr, td, p;
-        
+
         rkWebUtil.wipeDiv( this.parentdiv );
         topdiv = rkWebUtil.elemaker( "div", this.parentdiv, { "classes": [ "objectinfohbox" ] } );
         // TODO : maybe use a class other than "searchinner"?  It's got what I want,
@@ -159,7 +158,7 @@ fastdbap.ObjectInfo = class
                                                                     "minwid0", "flexgrow1" ] } );
 
         // Object info on the left
-        
+
         rkWebUtil.elemaker( "h4", infodiv, { "text": "diaobject " + this.data.objinfo.diaobjectid } );
         table = rkWebUtil.elemaker( "table", infodiv, { "classes": [ "borderless" ] } );
         tr = rkWebUtil.elemaker( "tr", table );
@@ -211,20 +210,20 @@ fastdbap.ObjectInfo = class
                                                         "colorlength": 3 } );
         infodiv.appendChild( this.ltcvtable.table );
 
-        
+
         // Lightcurve plots on right
 
         p = rkWebUtil.elemaker( "p", ltcvdiv, { "text": "Lightcurve display: " } );
-        
-        this.current_ltcv_display = "separate";
+
+        this.current_ltcv_display = "combined";
         this.ltcv_display_widget = rkWebUtil.elemaker( "select", p,
                                                        { "change": (e) => { self.update_ltcv_display() } } );
         rkWebUtil.elemaker( "option", this.ltcv_display_widget, { "value": "separate",
-                                                                   "text": "separate",
-                                                                  "attributes": { "selected": 1 } } );
+                                                                  "text": "separate" } );
         rkWebUtil.elemaker( "option", this.ltcv_display_widget, { "value": "combined",
-                                                                  "text": "combined" } );
-        
+                                                                  "text": "combined",
+                                                                  "attributes": { "selected": 1 } } );
+
         rkWebUtil.elemaker( "text", p, { "text": "    y scale: " } );
         this.current_ltcv_yscale = "nJy";
         this.ltcv_yscale_widget = rkWebUtil.elemaker( "select", p,
@@ -235,8 +234,12 @@ fastdbap.ObjectInfo = class
         rkWebUtil.elemaker( "option", this.ltcv_yscale_widget, { "value": "relative",
                                                                  "text": "relative" } )
 
+        this.colorcheckboxp = rkWebUtil.elemaker( "p", ltcvdiv );
+
         this.ltcvs_div = rkWebUtil.elemaker( "div", ltcvdiv );
-        
+
+        // Make the plots
+
         this.render_ltcvs();
     }
 
@@ -251,16 +254,29 @@ fastdbap.ObjectInfo = class
             this.current_ltcv_yscale = this.ltcv_yscale_widget.value;
             mustchange = true;
         }
-        if ( mustchange ) this.render_ltcvs();
+        let newshow = [];
+        for ( let b of this.allbands ) {
+            let show = this.band_checkboxes[b].checked;
+            if ( ( (!show) && this.shownbands.includes(b) ) || ( show && (!this.shownbands.includes(b)) ) )
+                mustchange = true;
+            if ( show )
+                newshow.push( b );
+        }
+        if ( mustchange ) {
+            this.shownbands = newshow;
+            this.render_ltcvs();
+        }
     }
-    
-    
+
+
     render_ltcvs()
     {
+        let self = this;
+
         rkWebUtil.wipeDiv( this.ltcvs_div );
-        
+
         let ytitle = "flux (nJy)";
-        if ( this.currenet_ltcv_yscale == 'relative' ) ytitle = "flux (rel.)";
+        if ( this.current_ltcv_yscale == 'relative' ) ytitle = "flux (rel.)";
 
         if ( this.current_ltcv_display == "combined" ) {
             let plot = new SVGPlot.Plot( { "name": "combined",
@@ -272,7 +288,7 @@ fastdbap.ObjectInfo = class
                                            "defaultlimits": [ this.minmjd, this.maxmjd, null, null ],
                                            "zoommode": "default"
                                          } );
-            for ( let b of this.allbands ) {
+            for ( let b of this.shownbands ) {
                 if ( this.current_ltcv_yscale == 'relative' ) {
                     plot.addDataset( this.datasets[b].rel.detected );
                     plot.addDataset( this.datasets[b].rel.undetected );
@@ -284,7 +300,7 @@ fastdbap.ObjectInfo = class
             this.ltcvs_div.appendChild( plot.topdiv );
         }
         else {
-            for ( let b of this.allbands ) {
+            for ( let b of this.shownbands ) {
                 let plot = new SVGPlot.Plot( { "name": b,
                                                "divid": "svgplotdiv_" + b,
                                                "svgid": "svgplotsvg_" + b,
@@ -304,8 +320,53 @@ fastdbap.ObjectInfo = class
                 this.ltcvs_div.appendChild( plot.topdiv );
             }
         }
+
+        // Checkbox row at the top for selecting colors.  Do this after the plots
+        //   so that all the stuff we need is defined.  (It may have already been...)
+
+        rkWebUtil.wipeDiv( this.colorcheckboxp );
+        rkWebUtil.elemaker( "text", this.colorcheckboxp, { "text": "Show Bands:  " } );
+        this.band_checkboxes = {};
+        for ( let b of this.allbands ) {
+            let ds;
+            if ( this.current_ltcv_yscale == "relative" )
+                ds = this.datasets[b].rel.detected;
+            else
+                ds = this.datasets[b].abs.detected;
+            let checkbox = rkWebUtil.elemaker( "input", this.colorcheckboxp,
+                                               { "attributes": { "type": "checkbox" },
+                                                 "id": "color-checkbox-" + b,
+                                                 "change": (e) => { self.update_ltcv_display() } } );
+            if ( this.shownbands.includes( b ) )
+                checkbox.setAttribute( "checked", 1 );
+            let label = rkWebUtil.elemaker( "label", this.colorcheckboxp,
+                                            { "attributes": { "for": "color-checkbox-" + b } } );
+            let span = rkWebUtil.elemaker( "span", label,
+                                           { "attributes":
+                                             { "style": "display: inline-block; color: " + ds.markercolor } } );
+            let svg = SVGPlot.svg();
+            svg.setAttribute( "width", "1ex" );
+            svg.setAttribute( "height", "1ex" );
+            svg.setAttribute( "viewBox", "0 0 10 10" );
+            span.appendChild( svg );
+            // let defs = rkWebUtil.elemaker( "defs", svg, { "svg": true } );
+            // defs.appendChild( ds.marker );
+            let polyline = rkWebUtil.elemaker( "polyline", svg,
+                                               { "svg": true,
+                                                 "attributes": {
+                                                     "class": ds.name,
+                                                     "points": "5,5",
+                                                     "marker-start": "url(#" + ds.marker.id + ")",
+                                                     "marker-mid": "url(#" + ds.marker.id + ")",
+                                                     "marker-end": "url(#" + ds.marker.id + ")" } } );
+            rkWebUtil.elemaker( "text", span, { "text": " " + b } );
+            rkWebUtil.elemaker( "text", this.colorcheckboxp, { "text": "   " } );
+
+            this.band_checkboxes[b] = checkbox;
+        }
+
     }
-        
+
 }
 
 

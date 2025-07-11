@@ -144,7 +144,7 @@ Installing for tests
   make install
 
 
-  .. _autoreconf-install:
+.. _autoreconf-install:
 
 If you've modified the base autotools files
 -------------------------------------------
