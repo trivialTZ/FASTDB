@@ -13,6 +13,8 @@ fastdbap.ObjectInfo = class
         this.data = data;
         this.context = context;
         this.parentdiv = parentdiv;
+        this.combined_plot = null;
+        this.combined_plot_is_rel = false;
 
         this.data['s/n'] = [];
         for ( let i in this.data.psfflux ) {
@@ -286,6 +288,17 @@ fastdbap.ObjectInfo = class
     {
         let self = this;
 
+        let curxmin=null;
+        let curxmax=null;
+        let curymin=null;
+        let curymax=null;
+        if ( this.combined_plot != null ) {
+            curxmin = this.combined_plot.xmin;
+            curxmax = this.combined_plot.xmax;
+            curymin = this.combined_plot.ymin;
+            curymax = this.combined_plot.ymax;
+        }
+
         rkWebUtil.wipeDiv( this.ltcvs_div );
 
         let minmaxmjd = this.get_min_max_mjd()
@@ -309,13 +322,14 @@ fastdbap.ObjectInfo = class
             for ( let b of this.shownbands ) {
                 if ( this.current_ltcv_yscale == 'relative' ) {
                     plot.addDataset( this.datasets[b].rel.detected );
-                    if ( this.snow_nondet ) plot.addDataset( this.datasets[b].rel.undetected );
+                    if ( this.show_nondet ) plot.addDataset( this.datasets[b].rel.undetected );
                 } else {
                     plot.addDataset( this.datasets[b].abs.detected );
                     if ( this.show_nondet ) plot.addDataset( this.datasets[b].abs.undetected );
                 }
             }
             this.ltcvs_div.appendChild( plot.topdiv );
+            this.combined_plot = plot;
         }
         else {
             for ( let b of this.shownbands ) {
@@ -383,6 +397,21 @@ fastdbap.ObjectInfo = class
 
             this.band_checkboxes[b] = checkbox;
         }
+
+        // If we're doing a combined plot, and we already one, try to preserve the zoom.
+        // (TODO: preserve zoom on individual plots.)  Only preserve the y axis if
+        // the axis units are the same.
+        if ( curxmin != null ) {
+            let plotrange = this.combined_plot.calc_autoscale()
+            if ( ( ( this.combined_plot_is_rel ) && ( this.current_ltcv_yscale == 'relative' ) ) ||
+                 ( ( ! this.combined_plot_is_rel ) && ( this.current_ltcv_yscale != 'relative' ) ) ) {
+                plotrange.ymin = curymin;
+                plotrange.ymax = curymax;
+            }
+            this.combined_plot.zoomTo( curxmin, curxmax, plotrange.ymin, plotrange.ymax );
+        }
+        // Remember if we're relative for next time
+        this.combined_plot_is_rel = ( this.current_ltcv_yscale == 'relative' );
 
     }
 

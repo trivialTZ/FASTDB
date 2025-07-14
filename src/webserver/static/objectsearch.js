@@ -75,6 +75,10 @@ fastdbap.ObjectSearch = class
         if ( this.radius_widget.value.trim().length > 0 )
             searchcriteria.radius = this.radius_widget.value.trim();
 
+        rkWebUtil.wipeDiv( this.context.objectlistdiv );
+        this.context.searchtabs.selectTab( "objectsearch" );
+        rkWebUtil.elemaker( "p", this.context.objectlistdiv, { "text": "Searching for objects...",
+                                                                "classes": [ "bold", "italic", "warning" ] } );
         this.context.connector.sendHttpRequest( "/objectsearch/" + procver, searchcriteria,
                                                (data) => { self.context.object_search_results(data); } );
     }

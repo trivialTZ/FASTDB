@@ -227,11 +227,13 @@ def object_search( processing_version, return_format='json', **kwargs ):
         if ra is not None:
             radius = util.float_or_none_from_dict( kwargs, 'radius' )
             radius = radius if radius is not None else 10.
-            cursor.execute( "SELECT * INTO TEMP TABLE objsearch_tmp1 "
-                            "FROM diaobject "
-                            "WHERE processing_version=%(pv)s "
-                            "AND q3c_radial_query( ra, dec, %(ra)s, %(dec)s, %(rad)s )",
-                            { 'pv': procver, 'ra': ra, 'dec': dec, 'rad': radius/3600. } )
+            q = ( "SELECT * INTO TEMP TABLE objsearch_tmp1 "
+                  "FROM diaobject "
+                  "WHERE processing_version=%(pv)s "
+                  "AND q3c_radial_query( ra, dec, %(ra)s, %(dec)s, %(rad)s )" )
+            subdict = { 'pv': procver, 'ra': ra, 'dec': dec, 'rad': radius/3600. }
+            util.logger.debug( f"Sending query: {q} with subdict {subdict}" )
+            cursor.execute( q, subdict )
             nexttable = 'objsearch_tmp1'
 
         mint_firstdet = util.mjd_or_none_from_dict_mjd_or_timestring( kwargs, 'mint_firstdetection' )
@@ -271,31 +273,42 @@ def object_search( processing_version, return_format='json', **kwargs ):
         if statbands is not None:
             q += "WHERE s.band=ANY(%(bands)s) "
         q += "ORDER BY diaobjectid, srct"
-        cursor.execute( q, { 'pv': procver, 'bands': statbands } )
-        cursor.execute( "SELECT diaobjectid, ra, dec, COUNT(srcflux) AS ndet, "
-                        "        NULL::real AS maxflux, NULL::real AS maxdflux, "
-                        "        NULL::double precision AS maxfluxt, NULL::character(1) AS maxfluxband, "
-                        "        NULL::real as lastflux, NULL::real AS lastdflux, NULL::character(1) as lastfluxband, "
-                        "        NULL::double precision as lastfluxt "
-                        "INTO TEMP TABLE objsearch_srcstats "
-                        "FROM objsearch_sources "
-                        "GROUP BY diaobjectid, ra, dec" )
-        cursor.execute( "UPDATE objsearch_srcstats oss "
-                        "SET maxflux=subq.srcflux, maxdflux=subq.srcdflux, maxfluxt=subq.srct, "
-                        "    maxfluxband=subq.srcband "
-                        "FROM ( SELECT DISTINCT ON (diaobjectid) diaobjectid, srcflux, srcdflux, srct, srcband "
-                        "       FROM objsearch_sources "
-                        "       ORDER BY diaobjectid, srcflux DESC ) subq "
-                        "WHERE oss.diaobjectid=subq.diaobjectid" )
-        cursor.execute( "UPDATE objsearch_srcstats oss "
-                        "SET lastflux=subq.srcflux, lastdflux=subq.srcdflux, lastfluxt=subq.srct, "
-                        "    lastfluxband=subq.srcband "
-                        "FROM ( SELECT DISTINCT ON (diaobjectid) diaobjectid, srcflux, srcdflux, srct, srcband "
-                        "       FROM objsearch_sources "
-                        "       ORDER BY diaobjectid, srct DESC ) subq "
-                        "WHERE oss.diaobjectid=subq.diaobjectid" )
+        subdict = { 'pv': procver, 'bands': statbands }
+        util.logger.debug( f"Sending query: {q} with subdict {subdict}" )
+        cursor.execute( q, subdict )
+        q = ( "SELECT diaobjectid, ra, dec, COUNT(srcflux) AS ndet, "
+              "        NULL::real AS maxflux, NULL::real AS maxdflux, "
+              "        NULL::double precision AS maxfluxt, NULL::character(1) AS maxfluxband, "
+              "        NULL::real as lastflux, NULL::real AS lastdflux, NULL::character(1) as lastfluxband, "
+              "        NULL::double precision as lastfluxt "
+              "INTO TEMP TABLE objsearch_srcstats "
+              "FROM objsearch_sources "
+              "GROUP BY diaobjectid, ra, dec" )
+        util.logger.debug( f"Sending query {q}" )
+        cursor.execute( q )
+        q = ( "UPDATE objsearch_srcstats oss "
+              "SET maxflux=subq.srcflux, maxdflux=subq.srcdflux, maxfluxt=subq.srct, "
+              "    maxfluxband=subq.srcband "
+              "FROM ( SELECT DISTINCT ON (diaobjectid) diaobjectid, srcflux, srcdflux, srct, srcband "
+              "       FROM objsearch_sources "
+              "       ORDER BY diaobjectid, srcflux DESC ) subq "
+              "WHERE oss.diaobjectid=subq.diaobjectid" )
+        util.logger.debug( f"Sending query {q}" )
+        cursor.execute( q )
+        q = ( "UPDATE objsearch_srcstats oss "
+              "SET lastflux=subq.srcflux, lastdflux=subq.srcdflux, lastfluxt=subq.srct, "
+              "    lastfluxband=subq.srcband "
+              "FROM ( SELECT DISTINCT ON (diaobjectid) diaobjectid, srcflux, srcdflux, srct, srcband "
+              "       FROM objsearch_sources "
+              "       ORDER BY diaobjectid, srct DESC ) subq "
+              "WHERE oss.diaobjectid=subq.diaobjectid" )
+        util.logger.debug( f"Sending query {q}" )
+        cursor.execute( q )
 
-        q = ( "SELECT DISTINCT ON (t.diaobjectid) t.diaobjectid, t.ra, t.dec, t.ndet, "
+        # For some reason, Postgres was deciding not to use the index on this next query, which
+        #   raised the runtime by two orders of magnitude.  Hint fixed it.
+        q = ( "/*+ IndexScan(f idx_diaforcedsource_diaobjectidpv ) */ "
+              "SELECT DISTINCT ON (t.diaobjectid) t.diaobjectid, t.ra, t.dec, t.ndet, "
               "    t.maxflux AS maxdetflux, t.maxdflux AS maxdetfluxerr, t.maxfluxt AS maxdetfluxmjd, "
               "    t.maxfluxband as maxdetfluxband, "
               "    t.lastflux AS lastdetflux, t.lastdflux AS lastdetfluxerr, t.lastfluxt AS lastdetfluxmjd, "
@@ -307,11 +320,14 @@ def object_search( processing_version, return_format='json', **kwargs ):
         if statbands is not None:
             q += "WHERE f.band=ANY(%(bands)s) "
         q += "ORDER BY t.diaobjectid, f.midpointmjdtai DESC"
-        cursor.execute( q, { 'pv': procver, 'bands': statbands } )
+        subdict = { 'pv': procver, 'bands': statbands }
+        util.logger.debug( f"Sending query: {q} with subdict {subdict}" )
+        cursor.execute( q, subdict )
         columns = [ d[0] for d in cursor.description ]
         colummap = { cursor.description[i][0]: i for i in range( len(cursor.description) ) }
         rows = cursor.fetchall()
 
+        util.logger.debug( f"object_search returning {len(rows)} objects in format {return_format}" )
 
     if return_format == 'json':
         return { c: [ r[colummap[c]] for r in rows ] for c in columns }
