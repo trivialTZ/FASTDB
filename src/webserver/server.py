@@ -34,7 +34,7 @@ class MainPage( BaseView ):
 
 class GetProcVers( BaseView ):
     def do_the_things( self ):
-        global app
+        # global app
 
         with db.DB() as con:
             cursor = con.cursor()
@@ -46,7 +46,7 @@ class GetProcVers( BaseView ):
         rows = [ r[0] for r in ( pvrows + alrows ) ]
         rows.sort()
 
-        app.logger.debug( f"rows is {rows}" )
+        # app.logger.debug( f"GetProcVers: rows is {rows}" )
 
         return { 'status': 'ok',
                  'procvers': rows
@@ -57,6 +57,9 @@ class GetProcVers( BaseView ):
 
 class ProcVer( BaseView ):
     def do_the_things( self, procver ):
+        # global app
+        # app.logger.debug( f"In ProcVer with procver={procver}" )
+
         pvid = None
         with db.DB() as con:
             cursor = con.cursor()
@@ -85,10 +88,10 @@ class ProcVer( BaseView ):
                 return f"Unknonw processing version {procver}", 500
 
             retval = { 'status': 'ok', 'id': None, 'description': None, 'aliases': [] }
-            cursor.execute( "SELECT id,description FROM processiong_version WHERE id=%(pv)s", { 'pv': pvid } )
+            cursor.execute( "SELECT id,description FROM processing_version WHERE id=%(pv)s", { 'pv': pvid } )
             row = cursor.fetchone()
-            retval['id'] = row[0][0]
-            retval['description'] = row[0][1]
+            retval['id'] = row[0]
+            retval['description'] = row[1]
             cursor.execute( "SELECT description FROM processing_version_alias WHERE id=%(pv)s", { 'pv': pvid } )
             rows = cursor.fetchall()
             retval['aliases'] = [ r[0] for r in rows ]
