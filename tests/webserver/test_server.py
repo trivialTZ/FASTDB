@@ -2,8 +2,12 @@ import pytest
 import db
 
 
+# Include the procver fixture since it's a session scoped fixture,
+#  so somebody else might already have included it.  The tests
+#  need to take that into account, so put the fixture here tox make
+#  sure it's run even if this test is run by itself.
 @pytest.fixture( scope='module' )
-def server_test_processing_versions():
+def server_test_processing_versions( procver ):
     try:
         with db.DB() as con:
             cursor = con.cursor()
@@ -35,7 +39,8 @@ def test_getprocvers( server_test_processing_versions, test_user, fastdb_client 
     res = fastdb_client.post( '/getprocvers' )
     assert isinstance( res, dict )
     assert res['status'] == 'ok'
-    assert res['procvers'] == [ 'test_server_1', 'test_server_1_alias_1', 'test_server_1_alias_2',
+    assert res['procvers'] == [ 'test_procesing_version',
+                                'test_server_1', 'test_server_1_alias_1', 'test_server_1_alias_2',
                                 'test_server_2', 'test_server_2_alias_1', 'test_server_3' ]
 
 
