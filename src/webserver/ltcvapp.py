@@ -58,7 +58,7 @@ class GetRandomLtcv( GetLtcv ):
             cursor = dbcon.cursor()
             # THINK ; this may be slow, as it may sort the entire object table!  Or at least the index.
             # TABLESAMPLE may be a solution, but it doesn't interact with WHERE
-            #   the way I'd want it to.
+            #   the way I'd want it to.  (Empirically, doesn't seem too bad with a 4M object table.)
             cursor.execute( "SELECT diaobjectid FROM diaobject WHERE processing_version=%(pv)s "
                             "ORDER BY random() LIMIT 1", { 'pv': pv } )
             objid = cursor.fetchone()[0]
