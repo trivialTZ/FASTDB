@@ -16,9 +16,9 @@ fastdbap.ObjectInfo = class
         this.combined_plot = null;
         this.combined_plot_is_rel = false;
 
-        this.data['s/n'] = [];
-        for ( let i in this.data.psfflux ) {
-            this.data['s/n'].push( this.data.psfflux[i] / this.data.psffluxerr[i] );
+        this.data.ltcv['s/n'] = [];
+        for ( let i in this.data.ltcv.psfflux ) {
+            this.data.ltcv['s/n'].push( this.data.ltcv.psfflux[i] / this.data.ltcv.psffluxerr[i] );
         }
 
         let knownbands = [ 'u', 'g', 'r', 'i', 'z', 'Y' ];
@@ -43,42 +43,42 @@ fastdbap.ObjectInfo = class
         this.ltcvs = {}
 
         let unknownbands = [];
-        for ( let i in data.mjd ) {
-            if ( ! this.ltcvs.hasOwnProperty( data.band[i] ) ) {
-                this.ltcvs[data.band[i]] = { 'undetected': { 'mjd': [],
-                                                             'flux': [],
-                                                             'dflux': []
-                                                           },
-                                             'detected': { 'mjd': [],
-                                                           'flux': [],
-                                                           'dflux': []
-                                                         },
-                                             'min': 1e32,
-                                             'max': -1e32,
-                                           };
-                if ( knownbands.includes( data.band[i] ) ) {
-                    this.ltcvs[data.band[i]].detmarker = markerdict[ data.band[i] ][0];
-                    this.ltcvs[data.band[i]].nondetmarker = markerdict[ data.band[i] ][1];
-                    this.ltcvs[data.band[i]].color = colordict[ data.band[i] ];
+        for ( let i in data.ltcv.mjd ) {
+            if ( ! this.ltcvs.hasOwnProperty( data.ltcv.band[i] ) ) {
+                this.ltcvs[data.ltcv.band[i]] = { 'undetected': { 'mjd': [],
+                                                                  'flux': [],
+                                                                  'dflux': []
+                                                                },
+                                                  'detected': { 'mjd': [],
+                                                                'flux': [],
+                                                                'dflux': []
+                                                              },
+                                                  'min': 1e32,
+                                                  'max': -1e32,
+                                                };
+                if ( knownbands.includes( data.ltcv.band[i] ) ) {
+                    this.ltcvs[data.ltcv.band[i]].detmarker = markerdict[ data.ltcv.band[i] ][0];
+                    this.ltcvs[data.ltcv.band[i]].nondetmarker = markerdict[ data.ltcv.band[i] ][1];
+                    this.ltcvs[data.ltcv.band[i]].color = colordict[ data.ltcv.band[i] ];
                 } else {
-                    unknownbands.push( data.band[i] );
-                    this.ltcvs[data.band[i]].detmarker = 'dot';
-                    this.ltcvs[data.band[i]].nondetmarker = 'circle';
-                    this.ltcvs[data.band[i]].color = othercolors[ otherdex ];
+                    unknownbands.push( data.ltcv.band[i] );
+                    this.ltcvs[data.ltcv.band[i]].detmarker = 'dot';
+                    this.ltcvs[data.ltcv.band[i]].nondetmarker = 'circle';
+                    this.ltcvs[data.ltcv.band[i]].color = othercolors[ otherdex ];
                     otherdex += 1;
                     if ( otherdex >= othercolors.length ) otherdex = 0;
                 }
 
             }
             let which = 'undetected';
-            if ( data.isdet[i] ) which = "detected";
-            this.ltcvs[data.band[i]][which].mjd.push( data.mjd[i] );
-            this.ltcvs[data.band[i]][which].flux.push( data.psfflux[i] );
-            this.ltcvs[data.band[i]][which].dflux.push( data.psffluxerr[i] );
-            if ( data.psfflux[i] > this.ltcvs[data.band[i]].max )
-                this.ltcvs[data.band[i]].max = data.psfflux[i];
-            if ( data.psfflux[i] < this.ltcvs[data.band[i]].min )
-                this.ltcvs[data.band[i]].min = data.psfflux[i];
+            if ( data.ltcv.isdet[i] ) which = "detected";
+            this.ltcvs[data.ltcv.band[i]][which].mjd.push( data.ltcv.mjd[i] );
+            this.ltcvs[data.ltcv.band[i]][which].flux.push( data.ltcv.psfflux[i] );
+            this.ltcvs[data.ltcv.band[i]][which].dflux.push( data.ltcv.psffluxerr[i] );
+            if ( data.ltcv.psfflux[i] > this.ltcvs[data.ltcv.band[i]].max )
+                this.ltcvs[data.ltcv.band[i]].max = data.ltcv.psfflux[i];
+            if ( data.ltcv.psfflux[i] < this.ltcvs[data.ltcv.band[i]].min )
+                this.ltcvs[data.ltcv.band[i]].min = data.ltcv.psfflux[i];
         }
 
         this.allbands = [];
@@ -196,7 +196,7 @@ fastdbap.ObjectInfo = class
             return tr;
         };
 
-        this.ltcvtable = new rkWebUtil.SortableTable( this.data, fields, rowrenderer,
+        this.ltcvtable = new rkWebUtil.SortableTable( this.data.ltcv, fields, rowrenderer,
                                                       { "dictoflists": true,
                                                         "hdrs": hdrs,
                                                         "colorclasses": [ "whitebg", "greybg" ],
@@ -352,6 +352,7 @@ fastdbap.ObjectInfo = class
                 }
                 this.ltcvs_div.appendChild( plot.topdiv );
             }
+            this.combined_plot = null;
         }
 
         // Checkbox row at the top for selecting colors.  Do this after the plots
@@ -401,7 +402,7 @@ fastdbap.ObjectInfo = class
         // If we're doing a combined plot, and we already one, try to preserve the zoom.
         // (TODO: preserve zoom on individual plots.)  Only preserve the y axis if
         // the axis units are the same.
-        if ( curxmin != null ) {
+        if ( ( this.combined_plot != null ) && ( curxmin != null ) ) {
             let plotrange = this.combined_plot.calc_autoscale()
             if ( ( ( this.combined_plot_is_rel ) && ( this.current_ltcv_yscale == 'relative' ) ) ||
                  ( ( ! this.combined_plot_is_rel ) && ( this.current_ltcv_yscale != 'relative' ) ) ) {
@@ -417,15 +418,15 @@ fastdbap.ObjectInfo = class
 
     get_min_max_mjd()
     {
-        if ( this.data.mjd.length == 0 ) return { 'min': 60000., 'max': 60001. };
+        if ( this.data.ltcv.mjd.length == 0 ) return { 'min': 60000., 'max': 60001. };
 
         let minmjd = 1e32;
         let maxmjd = -1e32;
-        for ( let i in this.data.mjd ) {
-            if ( this.shownbands.includes( this.data.band[i] ) ) {
-                if ( this.data.isdet[i] || this.show_nondet ) {
-                    if ( this.data.mjd[i] < minmjd ) minmjd = this.data.mjd[i];
-                    if ( this.data.mjd[i] > maxmjd ) maxmjd = this.data.mjd[i];
+        for ( let i in this.data.ltcv.mjd ) {
+            if ( this.shownbands.includes( this.data.ltcv.band[i] ) ) {
+                if ( this.data.ltcv.isdet[i] || this.show_nondet ) {
+                    if ( this.data.ltcv.mjd[i] < minmjd ) minmjd = this.data.ltcv.mjd[i];
+                    if ( this.data.ltcv.mjd[i] > maxmjd ) maxmjd = this.data.ltcv.mjd[i];
                 }
             }
         }

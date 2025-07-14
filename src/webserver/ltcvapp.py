@@ -33,11 +33,12 @@ class GetLtcv( BaseView ):
             if row is None:
                 raise ValueError( f"Unknown object {objid} in processing version {procver}" )
             objinfo = { columns[i]: row[i] for i in range(len(columns)) }
+            # Convert procesing version to something usable for user display
+            objinfo['processing_version'] = f"{procver} ({objinfo['processing_version']})"
 
-            retval = ltcv.object_ltcv( procverint, objid, return_format='json', bands=bands, which=which, dbcon=dbcon )
-            retval['objinfo'] = objinfo
-            retval['objinfo']['processing_version'] = f"{procver} ({retval['objinfo']['processing_version']})"
-
+            ltcvdata = ltcv.object_ltcv( procverint, objid, return_format='json',
+                                         bands=bands, which=which, dbcon=dbcon )
+            retval= { 'status': 'ok', 'objinfo': objinfo, 'ltcv': ltcvdata }
             return retval
 
     def do_the_things( self, procver, objid ):

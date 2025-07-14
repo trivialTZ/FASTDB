@@ -31,6 +31,7 @@ class FastDBLoader:
                              'diasource', 'diaforcedsource',
                              'processing_version_alias', 'processing_version', 'snapshot',
                              'diaobject_snapshot', 'diasource_snapshot', 'diaforcedsource_snapshot',
+                             'ppdb_diaobject', 'ppdb_diaforcedsource', 'ppdb_diasource', 'ppdb_host_galaxy',
                             ]
 
     def disable_indexes_and_fks( self ):
