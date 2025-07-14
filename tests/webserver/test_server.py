@@ -25,8 +25,9 @@ def server_test_processing_versions():
 
     finally:
         with db.DB() as con:
-            cursor.execute( "DELETE FROM processing_version_alias WHERE id=ANY(64738,64739,64740)" )
-            cursor.execute( "DELETE FROM processing_version WHERE id=ANY(64738,64739,64740)" )
+            cursor = con.cursor()
+            cursor.execute( "DELETE FROM processing_version_alias WHERE id IN (64738,64739,64740)" )
+            cursor.execute( "DELETE FROM processing_version WHERE id IN (64738,64739,64740)" )
             con.commit()
 
 
@@ -35,7 +36,7 @@ def test_getprocvers( server_test_processing_versions, test_user, fastdb_client 
     assert isinstance( res, dict )
     assert res['status'] == 'ok'
     assert res['procvers'] == [ 'test_server_1', 'test_server_1_alias_1', 'test_server_1_alias_2',
-                                'test_server_2', 'test_server_2_alias_1' ]
+                                'test_server_2', 'test_server_2_alias_1', 'test_server_3' ]
 
 
 def test_procver( server_test_processing_versions, test_user, fastdb_client ):
@@ -47,7 +48,7 @@ def test_procver( server_test_processing_versions, test_user, fastdb_client ):
         assert res['description'] == 'test_server_1'
         assert res['aliases'] == [ 'test_server_1_alias_1', 'test_server_1_alias_2' ]
 
-    for suffix in [ '64738', 'test_server_2', 'test_server_2_alias_1' ]:
+    for suffix in [ '64739', 'test_server_2', 'test_server_2_alias_1' ]:
         res = fastdb_client.post( f'/procver/{suffix}' )
         assert isinstance( res, dict )
         assert res['status'] == 'ok'
@@ -63,7 +64,13 @@ def test_procver( server_test_processing_versions, test_user, fastdb_client ):
         assert res['description'] == 'test_server_3'
         assert res['aliases'] == []
 
-    res = fastdb_client.post( '/procver/64741' )
-    pass
-    res = fastdb_client.post( '/procver/does_not_exist' )
-    pass
+    # Reduce retries so that these calls will fail fast
+    orig_retries = fastdb_client.retries
+    try:
+        fastdb_client.retries = 0
+        with pytest.raises( RuntimeError, match='Got status 500 trying to connect' ):
+            res = fastdb_client.post( '/procver/64741' )
+        with pytest.raises( RuntimeError, match='Got status 500 trying to connect' ):
+            res = fastdb_client.post( '/procver/does_not_exist' )
+    finally:
+        fastdb_client.retries = orig_retries
