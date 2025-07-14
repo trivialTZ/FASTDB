@@ -14,11 +14,11 @@ def server_test_processing_versions():
             cursor.execute( "INSERT INTO processing_version(id,description,validity_start,validity_end) "
                             "VALUES (64740, 'test_server_3', NOW(), NULL)" )
             cursor.execute( "INSERT INTO processing_version_alias(id,description) "
-                            "VALUES (64738, 'test_server_1_alias_1', NOW(), NULL)" )
+                            "VALUES (64738, 'test_server_1_alias_1')" )
             cursor.execute( "INSERT INTO processing_version_alias(id,description) "
-                            "VALUES (64738, 'test_server_1_alias_2', NOW(), NULL)" )
+                            "VALUES (64738, 'test_server_1_alias_2')" )
             cursor.execute( "INSERT INTO processing_version_alias(id,description) "
-                            "VALUES (64739, 'test_server_2_alias_1', NOW(), NULL)" )
+                            "VALUES (64739, 'test_server_2_alias_1')" )
             con.commit()
 
         yield True
