@@ -55,6 +55,50 @@ class GetProcVers( BaseView ):
 
 # ======================================================================
 
+class ProcVer( BaseView ):
+    def do_the_things( self, procver ):
+        pvid = None
+        with db.DB() as con:
+            cursor = con.cursor()
+            try:
+                intpv = int(procver)
+                cursor.execute( "SELECT id FROM processing_version WHERE id=%(pv)s", { 'pv': intpv } )
+                rows = cursor.fetchall()
+                if len(rows) > 0:
+                    pvid = rows[0][0]
+            except Exception:
+                pass
+            if pvid is None:
+                cursor.execute( "SELECT id FROM processing_version WHERE description=%(pv)s", { 'pv': procver } )
+                row = cursor.fetchone()
+                if row is not None:
+                    pvid = row[0]
+            if pvid is None:
+                cursor.execute( "SELECT id FROM processing_version_alias "
+                                "WHERE description=%(pv)s ORDER BY description ",
+                                { 'pv': procver } )
+                row = cursor.fetchone()
+                if row is not None:
+                    pvid = row[0]
+
+            if pvid is None:
+                return f"Unknonw processing version {procver}", 500
+
+            retval = { 'status': 'ok', 'id': None, 'description': None, 'aliases': [] }
+            cursor.execute( "SELECT id,description FROM processiong_version WHERE id=%(pv)s", { 'pv': pvid } )
+            row = cursor.fetchone()
+            retval['id'] = row[0][0]
+            retval['description'] = row[0][1]
+            cursor.execute( "SELECT description FROM processing_version_alias WHERE id=%(pv)s", { 'pv': pvid } )
+            rows = cursor.fetchall()
+            retval['aliases'] = [ r[0] for r in rows ]
+            return retval
+
+
+
+
+# ======================================================================
+
 class CountThings( BaseView ):
     def do_the_things( self, which, procver ):
         global app
@@ -148,6 +192,7 @@ app.register_blueprint( spectrumapp.bp )
 urls = {
     "/": MainPage,
     "/getprocvers": GetProcVers,
+    "/procver/<procver>": ProcVer,
     "/count/<which>/<procver>": CountThings,
     "/objectsearch/<processing_version>": ObjectSearch
 }
