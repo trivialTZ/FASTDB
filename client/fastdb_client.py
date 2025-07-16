@@ -129,7 +129,7 @@ class FASTDBClient:
                 stat = fastdbini.stat()
                 if stat.st_mode & 0o077 != 0:
                     raise RuntimeError( "Permissions on ~/.fastdb.ini incorrect; must not be accesible "
-                                        "by group or world." )
+                                        "by group or world. Please run `chmod go-rwx ~/.fastdb.ini`" )
             config = configparser.ConfigParser()
             config.read( fastdbini )
             if server not in config:
