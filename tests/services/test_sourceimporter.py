@@ -633,8 +633,16 @@ def test_import_next60days_with_prev( import_next60days_prv ):
 
 # **********************************************************************
 # Now make sure that if we import 30 days, then import 60 days, we get what's expected
+#
+# The test_user fixture is here not becasue it's needed for the test, but because
+#   this is a convenient test for loading up a database for use developing the web ap.
+#   In the tests subdirectory, run
+#      pytest -v --trace services/test_sourceimporter.py::test_import_30days_60days
+#   and wait about a minute for the fixtures to finish.  When you get the (Pdb) prompt,
+#   you're at the beginning of this test.  Let that shell just sit there, and go play
+#   with the web ap.
 
-def test_import_30days_60days( import_30days_60days ):
+def test_import_30days_60days( import_30days_60days, test_user ):
     nobj, nroot, nsrc, nprvsrc, nprvfrc, nhosts = import_30days_60days
     assert nobj == 25
     assert nroot == 25

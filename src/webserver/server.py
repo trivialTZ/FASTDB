@@ -4,6 +4,7 @@ import flask
 import flask_session
 
 import db
+import ltcv
 import webserver.rkauth_flask as rkauth_flask
 import webserver.dbapp as dbapp
 import webserver.ltcvapp as ltcvapp
@@ -22,7 +23,129 @@ with open( config.secretkeyfile ) as ifp:
 
 class MainPage( BaseView ):
     def dispatch_request( self ):
+        app.logger.error( "Hello error." )
+        app.logger.warning( "Hello warning." )
+        app.logger.info( "Hello info." )
+        app.logger.debug( "Hello debug." )
         return flask.render_template( "fastdb_webap.html" )
+
+
+# ======================================================================
+
+class GetProcVers( BaseView ):
+    def do_the_things( self ):
+        # global app
+
+        with db.DB() as con:
+            cursor = con.cursor()
+            cursor.execute( "SELECT description FROM processing_version" )
+            pvrows = cursor.fetchall()
+            cursor.execute( "SELECT description FROM processing_version_alias" )
+            alrows = cursor.fetchall()
+
+        rows = [ r[0] for r in ( pvrows + alrows ) ]
+        rows.sort()
+
+        # app.logger.debug( f"GetProcVers: rows is {rows}" )
+
+        return { 'status': 'ok',
+                 'procvers': rows
+                }
+
+
+# ======================================================================
+
+class ProcVer( BaseView ):
+    def do_the_things( self, procver ):
+        # global app
+        # app.logger.debug( f"In ProcVer with procver={procver}" )
+
+        pvid = None
+        with db.DB() as con:
+            cursor = con.cursor()
+            try:
+                intpv = int(procver)
+                cursor.execute( "SELECT id FROM processing_version WHERE id=%(pv)s", { 'pv': intpv } )
+                rows = cursor.fetchall()
+                if len(rows) > 0:
+                    pvid = rows[0][0]
+            except Exception:
+                pass
+            if pvid is None:
+                cursor.execute( "SELECT id FROM processing_version WHERE description=%(pv)s", { 'pv': procver } )
+                row = cursor.fetchone()
+                if row is not None:
+                    pvid = row[0]
+            if pvid is None:
+                cursor.execute( "SELECT id FROM processing_version_alias "
+                                "WHERE description=%(pv)s ORDER BY description ",
+                                { 'pv': procver } )
+                row = cursor.fetchone()
+                if row is not None:
+                    pvid = row[0]
+
+            if pvid is None:
+                return f"Unknonw processing version {procver}", 500
+
+            retval = { 'status': 'ok', 'id': None, 'description': None, 'aliases': [] }
+            cursor.execute( "SELECT id,description FROM processing_version WHERE id=%(pv)s", { 'pv': pvid } )
+            row = cursor.fetchone()
+            retval['id'] = row[0]
+            retval['description'] = row[1]
+            cursor.execute( "SELECT description FROM processing_version_alias WHERE id=%(pv)s", { 'pv': pvid } )
+            rows = cursor.fetchall()
+            retval['aliases'] = [ r[0] for r in rows ]
+            return retval
+
+
+
+
+# ======================================================================
+
+class CountThings( BaseView ):
+    def do_the_things( self, which, procver ):
+        global app
+
+        tablemap = { 'object': 'diaobject',
+                     'source': 'diasource',
+                     'forced': 'diaforcedsource' }
+        if which not in tablemap:
+            return f"Unknown thing to count: {which}", 500
+        table = tablemap[ which ]
+
+        with db.DB() as dbcon:
+            cursor = dbcon.cursor()
+            cursor.execute( "SELECT id FROM processing_version WHERE description=%(pv)s",
+                            { 'pv': procver } )
+            rows = cursor.fetchall()
+            if len(rows) == 0:
+                cursor.execute( "SELECT id FROM processing_version_alias WHERE description=%(pv)s",
+                                { 'pv': procver } )
+                rows = cursor.fetchall()
+                if len(rows) == 0:
+                    return f"Unknown processing version {procver}", 500
+            pvid = rows[0][0]
+
+            cursor.execute( f"SELECT COUNT(*) FROM {table} WHERE processing_version=%(pv)s",
+                            { 'pv': pvid } )
+            rows = cursor.fetchall()
+
+        return { 'status': 'ok',
+                 'which': which,
+                 'count': rows[0][0]
+                }
+
+
+# ======================================================================
+
+class ObjectSearch( BaseView ):
+    def do_the_things( self, processing_version ):
+        global app
+        if not flask.request.is_json:
+            raise TypeError( "POST data was not JSON; send search criteria as a JSON dict" )
+        searchdata = flask.request.json
+
+        return ltcv.object_search( processing_version, return_format='json', **searchdata )
 
 
 # **********************************************************************
@@ -71,6 +194,10 @@ app.register_blueprint( spectrumapp.bp )
 
 urls = {
     "/": MainPage,
+    "/getprocvers": GetProcVers,
+    "/procver/<procver>": ProcVer,
+    "/count/<which>/<procver>": CountThings,
+    "/objectsearch/<processing_version>": ObjectSearch
 }
 
 usedurls = {}

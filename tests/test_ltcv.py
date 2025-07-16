@@ -1,7 +1,59 @@
+import numpy as np
+
 import ltcv
 
 
-# The fixture takes a while (30-60 seconds) to run.  Note that it's a module-scope fixture!
+def test_object_ltcv( procver, alerts_90days_sent_received_and_imported ):
+    nobj, nroot, nsrc, nfrc = alerts_90days_sent_received_and_imported
+    assert nobj == 37
+    assert nroot == 37
+    assert nsrc == 181
+    assert nfrc == 855
+
+    objid = 1981540
+
+    sources = ltcv.object_ltcv( procver.id, objid, return_format='pandas', which='detections' )
+    forced = ltcv.object_ltcv( procver.id, objid, return_format='pandas', which='forced' )
+    df = ltcv.object_ltcv( procver.id, objid, return_format='pandas', which='patch' )
+
+    # I know that the patch version of the lightcurve should have 41 points, and that
+    #   it's more than either sources or forced individfually
+    assert len(df) == 41
+    assert len(df) > len(sources)
+    assert len(df) > len(forced)
+
+    # I know the filters we should expect
+    assert set( np.unique( sources.band.values ) ) == { 'g', 'r', 'i', 'z', 'Y' }
+    assert set( np.unique( forced.band.values ) ) == { 'u', 'g', 'r', 'i', 'z', 'Y' }
+    assert set( np.unique( df.band.values ) ) == { 'u', 'g', 'r', 'i', 'z', 'Y' }
+    # All sources are detections.  No forced sources are patched
+    assert np.all( sources.isdet )
+    assert not np.any( forced.ispatch )
+    # There are some sources for which there are no forced photometry points yet
+    assert sources.mjd.max() > forced.mjd.max()
+    # The combined df should include that latest source
+    assert df.mjd.max() == sources.mjd.max()
+    # Some of df should be patches, but not all
+    assert np.any( df.ispatch )
+    assert not np.all( df.ispatch )
+    # All of the forced photometry should be in df
+    assert np.all( df[ ~df.ispatch ].mjd.values == forced.mjd.values )
+    assert np.all( df[ ~df.ispatch ].psfflux.values == forced.psfflux.values )
+    assert np.all( df[ ~df.ispatch ].psffluxerr.values == forced.psffluxerr.values )
+    # Make sure the patches match up
+    tmpdf = df[ df.ispatch ].set_index( [ 'mjd', 'band' ] )
+    tmpsrc = sources.set_index( [ 'mjd', 'band' ] )
+    tmpjoin = tmpdf.join( tmpsrc, how='inner', lsuffix='_j', rsuffix='_s' )
+    assert len(tmpjoin) == len(tmpdf)
+    assert np.all( tmpjoin.psfflux_j.values == tmpjoin.psfflux_s.values )
+    assert np.all( tmpjoin.psffluxerr_j.values == tmpjoin.psffluxerr_s.values )
+
+    # Make sure that the json return matches the pandas return
+    jsondict = ltcv.object_ltcv( procver.id, objid, return_format='json', which='patch' )
+    assert set( jsondict.keys() ) == set( df.columns )
+    assert all( np.all( df[c].values == np.array(jsondict[c]) ) for c in df.columns )
+
+
 def test_get_hot_ltcvs( procver, alerts_90days_sent_received_and_imported ):
     nobj, nroot, nsrc, nfrc = alerts_90days_sent_received_and_imported
     assert nobj == 37
