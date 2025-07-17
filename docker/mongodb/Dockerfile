@@ -1,7 +1,7 @@
-ARG ARCH=x86-64
+# FROM rknop/devuan-daedalus-rknop-$ARCH AS base
+# LABEL maintainer="Rob Knop <raknop@lbl.gov>"
 
-FROM rknop/devuan-daedalus-rknop-$ARCH AS base
-LABEL maintainer="Rob Knop <raknop@lbl.gov>"
+FROM mongo:8.0.11 AS BASE
 
 SHELL ["/bin/bash", "-c"]
 
@@ -15,7 +15,7 @@ WORKDIR /usr/src
 RUN apt-get update \
   && DEBIAN_FRONTEND="nointeractive" apt-get -y upgrade \
   && DEBIAN_FRONTEND="noninteractive" TZ="UTC" apt-get -y install -y --no-install-recommends \
-         ca-certificates gnupg curl sudo netcat-openbsd tmux locales \
+         ca-certificates sudo netcat-openbsd tmux locales \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
 
@@ -27,25 +27,6 @@ ENV LANGUAGE=en_US:en
 ENV LC_ALL=en_US.UTF-8
 
 ENV LESS=-XLRi
-
-# Install Mongo
-
-RUN curl -fsSL https://www.mongodb.org/static/pgp/server-8.0.asc | \
-   sudo gpg -o /usr/share/keyrings/mongodb-server-8.0.gpg \
-   --dearmor
-
-RUN if [ "$ARCH" == "aarch64" ]; then \
-    echo "deb [ signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg arch=arm64 ] http://repo.mongodb.org/apt/debian bookworm/mongodb-org/8.0 main" | sudo tee /etc/apt/sources.list.d/mongodb-org-8.0.list ; \
-    else \
-    echo "deb [ signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg arch=amd64 ] http://repo.mongodb.org/apt/debian bookworm/mongodb-org/8.0 main" | sudo tee /etc/apt/sources.list.d/mongodb-org-8.0.list ; \
-    fi
-
-RUN apt-get update \
-  && DEBIAN_FRONTEND="noninteractive" TZ="UTC" apt-get -y install -y --no-install-recommends \
-          mongodb-org \
-  && apt-get clean \
-  && rm -rf /var/lib/apt/lists/*
-
 
 COPY mongod.conf /etc/mongod.conf
 RUN mkdir -p /data/db
