@@ -7,7 +7,7 @@
 #
 # In general, to build the images, run
 #
-#   ARCH=<architecture> docker compose build --build-arg ARCH=<architecture>
+#   ARCH=<architecture> docker compose build
 #
 # where <architecture> is one of "x86_64" or "aarch64".  (In the case of
 # x86_64, you can optionally omit the intial ARCH=...)
