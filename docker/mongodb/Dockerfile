@@ -1,4 +1,6 @@
-FROM rknop/devuan-daedalus-rknop AS base
+ARG ARCH=x86-64
+
+FROM rknop/devuan-daedalus-rknop-$ARCH AS base
 LABEL maintainer="Rob Knop <raknop@lbl.gov>"
 
 SHELL ["/bin/bash", "-c"]

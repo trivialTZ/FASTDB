@@ -1,12 +1,24 @@
 # This is a docker compose environment to bring up a dev/test fastdb
-# environment
+# environment.
+#
+# To use it, you need to make sure to build it for the architecture of
+# your system.  If you're on an x86_64 system, it should work as is.  If
+# you're on an ARM system, then you need to do something different.
+#
+# In general, to build the images, run
+#
+#   ARCH=<architecture> docker compose build --build-arg ARCH=<architecture>
+#
+# where <architecture> is one of "x86_64" or "aarch64".  (In the case of
+# x86_64, you can optionally omit the intial ARCH=...)
 
 services:
   kafka-zookeeper:
-    image: ${DOCKER_ARCHIVE:-registry.nersc.gov/m1727/raknop}/fastdb-kafka-test:${DOCKER_VERSION:-latest}
-    platform: linux/amd64
+    image: ${DOCKER_ARCHIVE:-registry.nersc.gov/m1727/raknop}/fastdb-kafka-test-${ARCH:-x86_64}:${DOCKER_VERSION:-latest}
     build:
       context: ./docker/kafka
+      args:
+        ARCH: ${ARCH:-x86_64}
     healthcheck:
       test: netcat -w 1 localhost 2181 || exit 1
       interval: 5s
@@ -18,10 +30,11 @@ services:
     depends_on:
        kafka-zookeeper:
          condition: service_healthy
-    image: ${DOCKER_ARCHIVE:-registry.nersc.gov/m1727/raknop}/fastdb-kafka-test:${DOCKER_VERSION:-latest}
-    platform: linux/amd64
+    image: ${DOCKER_ARCHIVE:-registry.nersc.gov/m1727/raknop}/fastdb-kafka-test-${ARCH:-x86_64}:${DOCKER_VERSION:-latest}
     build:
       context: ./docker/kafka
+      args:
+        ARCH: ${ARCH:-x86_64}
     healthcheck:
       test: netcat -w 1 localhost 9092 || exit 1
       interval: 5s
@@ -30,11 +43,12 @@ services:
     entrypoint: [ "bin/kafka-server-start.sh", "config/server.properties" ]
 
   postgres:
-    image: ${DOCKER_ARCHIVE:-registry.nersc.gov/m1727/raknop}/fastdb-postgres:${DOCKER_VERSION:-latest}
-    platform: linux/amd64
+    image: ${DOCKER_ARCHIVE:-registry.nersc.gov/m1727/raknop}/fastdb-postgres-${ARCH:-x86_64}:${DOCKER_VERSION:-latest}
     build:
       context: ./docker/postgres
       target: postgres
+      args:
+        ARCH: ${ARCH:-x86_64}
     volumes:
       - type: volume
         source: postgres_data
@@ -50,10 +64,11 @@ services:
       retries: 10
 
   mongodb:
-    image: ${DOCKER_ARCHIVE:-registry.nersc.gov/m1727/raknop}/fastdb-mongodb:${DOCKER_VERSION:-latest}
-    platform: linux/amd64
+    image: ${DOCKER_ARCHIVE:-registry.nersc.gov/m1727/raknop}/fastdb-mongodb-${ARCH:-x86_64}:${DOCKER_VERSION:-latest}
     build:
       context: ./docker/mongodb
+      args:
+        ARCH: ${ARCH:-x86_64}
     environment:
       - MONGODB_HOST=mongodb
       - MONGODB_DBNAME=brokeralert
@@ -78,11 +93,12 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    image: ${DOCKER_ARCHIVE:-registry.nersc.gov/m1727/raknop}/fastdb-shell:${DOCKER_VERSION:-latest}
-    platform: linux/amd64
+    image: ${DOCKER_ARCHIVE:-registry.nersc.gov/m1727/raknop}/fastdb-shell-${ARCH:-x86_64}:${DOCKER_VERSION:-latest}
     build:
       context: ./docker/webserver
       target: shell
+      args:
+        ARCH: ${ARCH:-x86_64}
     user: ${USERID:-0}:${GROUPID:-0}
     volumes:
       - type: bind
@@ -93,7 +109,6 @@ services:
 
   mailhog:
     image: mailhog/mailhog:latest
-    platform: linux/amd64
     ports:
       - "${MAILHOG_PORT:-8025}:8025"
 
@@ -101,11 +116,12 @@ services:
     depends_on:
       createdb:
         condition: service_completed_successfully
-    image: ${DOCKER_ARCHIVE:-registry.nersc.gov/m1727/raknop}/fastdb-query-runner:${DOCKER_VERSION:-latest}
-    platform: linux/amd64
+    image: ${DOCKER_ARCHIVE:-registry.nersc.gov/m1727/raknop}/fastdb-query-runner-${ARCH:-x86_64}:${DOCKER_VERSION:-latest}
     build:
       context: ./docker/query_runner
       target: queryrunner
+      args:
+        ARCH: ${ARCH:-x86_64}
     user: ${USERID:-0}:${GROUPID:-0}
     volumes:
       - type: bind
@@ -133,11 +149,12 @@ services:
         condition: service_started
       queryrunner:
         condition: service_started
-    image: ${DOCKER_ARCHIVE:-registry.nersc.gov/m1727/raknop}/fastdb-webap:${DOCKER_VERSION:-latest}
-    platform: linux/amd64
+    image: ${DOCKER_ARCHIVE:-registry.nersc.gov/m1727/raknop}/fastdb-webap-${ARCH:-x86_64}:${DOCKER_VERSION:-latest}
     build:
       context: ./docker/webserver
       target: webserver
+      args:
+        ARCH: ${ARCH:-x86_64}
     environment:
       - MONGODB_HOST=mongodb
       - MONGODB_DBNAME=brokeralert
@@ -190,11 +207,12 @@ services:
         condition: service_healthy
       createdb:
         condition: service_completed_successfully
-    image: ${DOCKER_ARCHIVE:-registry.nersc.gov/m1727/raknop}/fastdb-shell:${DOCKER_VERSION:-latest}
-    platform: linux/amd64
+    image: ${DOCKER_ARCHIVE:-registry.nersc.gov/m1727/raknop}/fastdb-shell-${ARCH:-x86_64}:${DOCKER_VERSION:-latest}
     build:
       context: ./docker/webserver
       target: shell
+      args:
+        ARCH: ${ARCH:-x86_64}
     environment:
       - MONGODB_HOST=mongodb
       - MONGODB_DBNAME=brokeralert
@@ -242,11 +260,12 @@ services:
         condition: service_healthy
       mongodb:
         condition: service_healthy
-    image: ${DOCKER_ARCHIVE:-registry.nersc.gov/m1727/raknop}/fastdb-shell:${DOCKER_VERSION:-latest}
-    platform: linux/amd64
+    image: ${DOCKER_ARCHIVE:-registry.nersc.gov/m1727/raknop}/fastdb-shell-${ARCH:-x86_64}:${DOCKER_VERSION:-latest}
     build:
       context: ./docker/webserver
       target: shell
+      args:
+        ARCH: ${ARCH:-x86_64}
     environment:
       - MONGODB_HOST=mongodb
       - MONGODB_DBNAME=brokeralert

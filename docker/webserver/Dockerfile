@@ -7,7 +7,9 @@
 #   DOCKER_BUILDKIT=1 docker build --target webserver -t registry.nersc.gov/m1727/raknop/fastdb-webap:rknop-dev .
 #   DOCKER_BUILDKIT=1 docker build --target shell -t registry.nersc.gov/m1727/raknop/fastdb-shell:rknop-dev .
 
-FROM rknop/devuan-daedalus-rknop AS base
+ARG ARCH=x86_64
+
+FROM rknop/devuan-daedalus-rknop-$ARCH AS base
 LABEL maintainer="Rob Knop <rknop@pobox.com>"
 
 SHELL ["/bin/bash", "-c"]
