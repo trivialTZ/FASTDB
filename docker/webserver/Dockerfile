@@ -20,7 +20,7 @@ ENV TZ="UTC"
 RUN  apt-get update \
     && apt-get -y upgrade \
     && apt-get -y install -y \
-         python3 locales tmux netcat-openbsd gnupg curl elinks postgresql-client make rlwrap socat \
+         python3 locales tmux netcat-openbsd gnupg curl elinks postgresql-client make rlwrap socat ca-certificates \
     && apt-get -y autoremove \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*

@@ -31,7 +31,7 @@ FROM base AS build
 RUN DEBIAN_FRONTEND="noninteractive" TZ="UTC" \
     apt-get update \
     && DEBIAN_FRONTEND="noninteractive" TZ="UTC" \
-    apt-get -y install -y python3-pip python3-venv git libpq-dev
+    apt-get -y install -y python3-pip python3-venv git libpq-dev ca-certificates
 
 RUN mkdir /venv
 RUN python3 -mvenv /venv

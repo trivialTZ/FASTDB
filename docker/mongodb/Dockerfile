@@ -12,7 +12,7 @@ WORKDIR /usr/src
 RUN apt-get update \
   && DEBIAN_FRONTEND="nointeractive" apt-get -y upgrade \
   && DEBIAN_FRONTEND="noninteractive" TZ="UTC" apt-get -y install -y --no-install-recommends \
-         gnupg curl sudo netcat-openbsd tmux locales \
+         ca-certificates gnupg curl sudo netcat-openbsd tmux locales \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
 

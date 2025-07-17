@@ -8,7 +8,7 @@ LABEL maintainenr="Rob Knop <raknop@lbl.gov>"
 SHELL ["/bin/bash", "-c"]
 RUN apt-get -y update \
    && apt-get -y upgrade \
-   && apt-get -y install openjdk-17-jre curl netcat-openbsd \
+   && apt-get -y install openjdk-17-jre curl netcat-openbsd ca-certificates \
    && apt-get clean \
    && rm -rf /var/lib/apt/lists/*
 
