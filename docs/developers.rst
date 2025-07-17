@@ -65,26 +65,14 @@ Build and run the Docker services
 
 The file ``docker-compose.yaml`` in the top-level directory contains (almost) everything necessary to bring up a test FASTDB environment on your local machine.  You'll need to have some form of docker installed, with a new enough version of ``docker compose``.  Rob is able to get things to work with Docker 20.10.24 (run ``docker --version``) and docker compose 2.36.2 (run ``docker compose version``).  If you have older versions and something doesn't work, try upgrading.  You'll need to have the docker container runtime going; how that works depends on exactly which docker you install.  On a Linux, we rcommend `installing Docker Engline <https://docs.docker.com/engine/install/>`_.  On a Mac, you can also try that, but people have had success with `Docker Desktop <https://www.docker.com/products/docker-desktop>`_.
 
-First, you need to figure out your architecture.  If it's not ``x86_64`` or ``aarch64``, then you're system is not supported.  (Or, rather, it may be supported, but you'll have to do platform emulation, which makes some things very slow.)  To figure out your system architecture, try runnning ``uname -a``.  The output will look something like::
+You can build all the docker images necessary to create a development/test environment by running the following in the top level directory of your git checkout::
 
-   Linux rosalind 6.12.30+bpo-amd64 #1 SMP PREEMPT_DYNAMIC Debian 6.12.30-1~bpo12+1 (2025-06-14) x86_64 GNU/Linux
-
-In this case, the architecture is ``x86_64``; it shows up as the penultimate word on the line.  It won't always show up exactly there, however.  Look for the words ``amd64``, ``x86_64``, ``aarch64``, or ``arm64`` somewhere in that string, probably near the end.  If you see either ``aarch64`` or ``arm64``, then your architecture is ``aarch64``.  If you see either ``amd64`` or ``x86_64``, then your architecture is ``x86_64``.  (Be careful not to confuse ``amd64`` with ``arm64``!) You will use this architecure repreatedly.  If you run::
-
-  export ARCH=<architecture>
-
-replacing ``<architecture>`` with ``x86_64`` or ``aarch64`` as appropriate, then you can leave off the ``ARCH=<architecture>`` at the beginning of all the following ``docker compose commands``, as long as you make sure you run those commands in a shell where you've set this environment variable.
-
-you can build all the docker images necessary to create a development/test environment by running the following in the top level directory of your git checkout::
-
-  ARCH=<architecture> docker compose build
-
-where ``<architecture>`` is either ``x86_64`` or ``aarch64``, as appropriate for your system.
+  docker compose build
 
 Once you've successfully built the docker environments, run::
 
-  ARCH=<architecture> docker compose up -d webap
-  ARCH=<architecture> docker compose up -d shell
+  docker compose up -d webap
+  docker compose up -d shell
 
 (For those of you who know docker compose and are wondering why ``webap`` is not just a prerequisite for ``shell``, the reason is so one can get a debug environment up even when code errors prevent the web application from successfully starting.)
 
@@ -119,7 +107,7 @@ It's possible the shell server won't start, usually because the ``createdb`` ste
 
 to see if there's an obvious error message you know how to fix.  Failing that, you can run::
 
-  ARCH=<architecture> docker compose up -d shell-nocreatedb
+  docker compose up -d shell-nocreatedb
 
 That will bring up a shell server you can connect to and work with that will have the Postgres and Mongo servers running, but which will (probably) not have the tables created on the Postgres server.  (It's also possible other steps will fail, in which more work may potentially be required.)
 
@@ -256,7 +244,7 @@ If you edit the web ap software and what to see the changes, you need to do a co
 
   kill -HUP 1
 
-If all is well, then your webserver is now running the new code; shift-reload it in your browser to see it.  If the webap shell immediately exits after this ``kill`` command, it means you broker the server-side software enough that it no longer runs.  Do ``docker compose logs webap`` to see the logs, and try to fix the errors.  Once you've fixed them, you will need to do ``docker compose down webap`` and ``ARCH=<architecture> docker compose up -d webap`` to get the webap running again.
+If all is well, then your webserver is now running the new code; shift-reload it in your browser to see it.  If the webap shell immediately exits after this ``kill`` command, it means you broker the server-side software enough that it no longer runs.  Do ``docker compose logs webap`` to see the logs, and try to fix the errors.  Once you've fixed them, you will need to do ``docker compose down webap`` and ``docker compose up -d webap`` to get the webap running again.
 
 
 Creating a persistent test user
