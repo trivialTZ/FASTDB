@@ -1,16 +1,5 @@
 # This is a docker compose environment to bring up a dev/test fastdb
 # environment.
-#
-# To use it, you need to make sure to build it for the architecture of
-# your system.  If you're on an x86_64 system, it should work as is.  If
-# you're on an ARM system, then you need to do something different.
-#
-# In general, to build the images, run
-#
-#   ARCH=<architecture> docker compose build
-#
-# where <architecture> is one of "x86_64" or "aarch64".  (In the case of
-# x86_64, you can optionally omit the intial ARCH=...)
 
 services:
   kafka-zookeeper:
