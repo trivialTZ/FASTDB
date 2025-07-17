@@ -5,7 +5,7 @@
 #   DOCKER_BUILDKIT=1 docker build --target postgres -t registry.nersc.gov/m1727/raknop/fastdb-postgres:rknop-dev .
 #
 
-FROM rknop/devuan-daedalus-rknop AS base
+FROM debian:bookworm-20250630 AS base
 LABEL maintainer="Rob Knop <raknop@lbl.gov>"
 
 SHELL ["/bin/bash", "-c"]
@@ -45,7 +45,7 @@ WORKDIR /build
 RUN apt-get update \
   && DEBIAN_FRONTEND="noninteractive" TZ="UTC" apt-get -y install -y --no-install-recommends \
       make git gcc libssl-dev libreadline-dev zlib1g-dev libzstd-dev liblz4-dev curl \
-      postgresql-server-dev-15
+      postgresql-server-dev-15 ca-certificates
 
 RUN git clone https://github.com/segasai/q3c.git
 RUN cd q3c \
