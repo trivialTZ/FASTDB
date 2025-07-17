@@ -35,9 +35,9 @@ RUN curl -fsSL https://www.mongodb.org/static/pgp/server-8.0.asc | \
    --dearmor
 
 RUN if [ "$ARCH" == "aarch64" ]; then \
-    echo "deb [ signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg,arch=arm64 ] http://repo.mongodb.org/apt/debian bookworm/mongodb-org/8.0 main" | sudo tee /etc/apt/sources.list.d/mongodb-org-8.0.list ; \
+    echo "deb [ signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg arch=arm64 ] http://repo.mongodb.org/apt/debian bookworm/mongodb-org/8.0 main" | sudo tee /etc/apt/sources.list.d/mongodb-org-8.0.list ; \
     else \
-    echo "deb [ signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg,arch=amd64 ] http://repo.mongodb.org/apt/debian bookworm/mongodb-org/8.0 main" | sudo tee /etc/apt/sources.list.d/mongodb-org-8.0.list ; \
+    echo "deb [ signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg arch=amd64 ] http://repo.mongodb.org/apt/debian bookworm/mongodb-org/8.0 main" | sudo tee /etc/apt/sources.list.d/mongodb-org-8.0.list ; \
     fi
 
 RUN apt-get update \
