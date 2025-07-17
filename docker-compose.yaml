@@ -1,10 +1,9 @@
 # This is a docker compose environment to bring up a dev/test fastdb
-# environment
+# environment.
 
 services:
   kafka-zookeeper:
     image: ${DOCKER_ARCHIVE:-registry.nersc.gov/m1727/raknop}/fastdb-kafka-test:${DOCKER_VERSION:-latest}
-    platform: linux/amd64
     build:
       context: ./docker/kafka
     healthcheck:
@@ -19,7 +18,6 @@ services:
        kafka-zookeeper:
          condition: service_healthy
     image: ${DOCKER_ARCHIVE:-registry.nersc.gov/m1727/raknop}/fastdb-kafka-test:${DOCKER_VERSION:-latest}
-    platform: linux/amd64
     build:
       context: ./docker/kafka
     healthcheck:
@@ -31,7 +29,6 @@ services:
 
   postgres:
     image: ${DOCKER_ARCHIVE:-registry.nersc.gov/m1727/raknop}/fastdb-postgres:${DOCKER_VERSION:-latest}
-    platform: linux/amd64
     build:
       context: ./docker/postgres
       target: postgres
@@ -51,7 +48,6 @@ services:
 
   mongodb:
     image: ${DOCKER_ARCHIVE:-registry.nersc.gov/m1727/raknop}/fastdb-mongodb:${DOCKER_VERSION:-latest}
-    platform: linux/amd64
     build:
       context: ./docker/mongodb
     environment:
@@ -79,7 +75,6 @@ services:
       postgres:
         condition: service_healthy
     image: ${DOCKER_ARCHIVE:-registry.nersc.gov/m1727/raknop}/fastdb-shell:${DOCKER_VERSION:-latest}
-    platform: linux/amd64
     build:
       context: ./docker/webserver
       target: shell
@@ -93,7 +88,6 @@ services:
 
   mailhog:
     image: mailhog/mailhog:latest
-    platform: linux/amd64
     ports:
       - "${MAILHOG_PORT:-8025}:8025"
 
@@ -102,7 +96,6 @@ services:
       createdb:
         condition: service_completed_successfully
     image: ${DOCKER_ARCHIVE:-registry.nersc.gov/m1727/raknop}/fastdb-query-runner:${DOCKER_VERSION:-latest}
-    platform: linux/amd64
     build:
       context: ./docker/query_runner
       target: queryrunner
@@ -134,7 +127,6 @@ services:
       queryrunner:
         condition: service_started
     image: ${DOCKER_ARCHIVE:-registry.nersc.gov/m1727/raknop}/fastdb-webap:${DOCKER_VERSION:-latest}
-    platform: linux/amd64
     build:
       context: ./docker/webserver
       target: webserver
@@ -191,7 +183,6 @@ services:
       createdb:
         condition: service_completed_successfully
     image: ${DOCKER_ARCHIVE:-registry.nersc.gov/m1727/raknop}/fastdb-shell:${DOCKER_VERSION:-latest}
-    platform: linux/amd64
     build:
       context: ./docker/webserver
       target: shell
@@ -243,7 +234,6 @@ services:
       mongodb:
         condition: service_healthy
     image: ${DOCKER_ARCHIVE:-registry.nersc.gov/m1727/raknop}/fastdb-shell:${DOCKER_VERSION:-latest}
-    platform: linux/amd64
     build:
       context: ./docker/webserver
       target: shell

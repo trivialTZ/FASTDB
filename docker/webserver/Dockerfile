@@ -7,7 +7,7 @@
 #   DOCKER_BUILDKIT=1 docker build --target webserver -t registry.nersc.gov/m1727/raknop/fastdb-webap:rknop-dev .
 #   DOCKER_BUILDKIT=1 docker build --target shell -t registry.nersc.gov/m1727/raknop/fastdb-shell:rknop-dev .
 
-FROM rknop/devuan-daedalus-rknop AS base
+FROM debian:bookworm-20250630 AS base
 LABEL maintainer="Rob Knop <rknop@pobox.com>"
 
 SHELL ["/bin/bash", "-c"]
@@ -18,7 +18,7 @@ ENV TZ="UTC"
 RUN  apt-get update \
     && apt-get -y upgrade \
     && apt-get -y install -y \
-         python3 locales tmux netcat-openbsd gnupg curl elinks postgresql-client make rlwrap socat \
+         python3 locales tmux netcat-openbsd gnupg curl elinks postgresql-client make rlwrap socat ca-certificates \
     && apt-get -y autoremove \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*

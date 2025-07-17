@@ -31,11 +31,11 @@ to get the current version of all submodules.
 Installing the Code
 ===================
 
-(If you're reading this documentation for the first time, don't try to do what's in this section directly.  Rather, read on.  You will want to refer back to this section later.  First, though, you will probably want to do everything below about setting up a test environment.)
+(If you're reading this documentation for the first time, don't try to do what's in this section directly.  Rather, read on.  You will want to refer back to this section later.  First, though, you will probably want to do everything below about setting up a test environment.  That sections includes everything you need to install the test code.  This section is more general, and what you'd think about if you're trying to install a FASTDB instance somewhere else.)
 
 The code (for the most part) is not designed to be run out of the ``src`` directory where it exists, though you may be able to get that to work.  Ideally, you should install the code first.  Exactly where you're installing it depends on what you're trying to do.  If you're just trying to get a local test environment going on your own machine, see :ref:`local-test-env`.
 
-If you've edited a ``Makefile.am`` file in any directory, or the ``configure.ac`` file in the top-level directory, see :ref:`autoreconv-install` below.  Otherwise, to install the code, you can run just two commands::
+If you've edited a ``Makefile.am`` file in any directory, or the ``configure.ac`` file in the top-level directory, see :ref:`autoreconf-install` below.  Otherwise, to install the code, you can run just two commands::
 
   ./configure --with-installdir=[DIR] --with-smtp-server=[SERVER] --with-smpt-port=[PORT]
   make install
@@ -46,7 +46,7 @@ The first ``[DIR]`` is the directory where you want to install the code.  The SM
 
 as usual with GNU autotools to see what other options are available.  If you're making a production install of FASTDB somewhere, you will definitely want to do things like configure the database connection.
 
-It's possible that after running the first command, you'll get errors about ``aclocal-1.16 is missing on your system`` or something similar.  There are two possibilites; one is that you do legimiately need to rebuild the autotools file, in which case see :ref:`autoreconf-install` below.  If you haven't, it may be result of an unfortunate interaction between autotools and git; autotools (at least some versions) looks at timestamps, but git checkouts do not restore timestamps of files committed to the archive.  In this case, you can run::
+It's possible that after running the first command, you'll get errors about ``aclocal-1.16 is missing on your system`` or something similar.  There are two possibilites; one is that you do legimiately need to rebuild the autotools file, in which case see :ref:`autoreconf-install` below.  However, if you haven't touchedd the files ``aclocal.m4``, ``configure``, or, in any subdirectory, ``Makefile.in`` or ``Makefile.am``, then this error may be result of an unfortunate interaction between autotools and git; autotools (at least some versions) looks at timestamps, but git checkouts do not restore timestamps of files committed to the archive.  In this case, you can run::
 
   touch aclocal.m4 configure
   find . -name Makefile.am -exec touch \{\} \;
@@ -60,22 +60,14 @@ and then retry the ``./configure`` command above.
 Local Test Environment
 =======================
 
-Setup Docker on an ARM Mac (those with Apple Silicon)
------------------------------------------------------
-
-It is recommended to use the Docker Desktop application for ARM Macs. You can download it from https://www.docker.com/products/docker-desktop/ . In the settings deselect Rosetta2:
-
-.. image:: _static/images/docker_settings.png
-   :alt: Docker settings
-
 Build and run the Docker services
 ----------------------------------
 
-The file ``docker-compose.yaml`` in the top-level directory contains (almost) everything necessary to bring up a test FASTDB environment on your local machine.  Make sure you have the docker container runtime and the docker compose extensions installed, make sure that your current working directory is the top-level directory of your git checkout, and run::
+The file ``docker-compose.yaml`` in the top-level directory contains (almost) everything necessary to bring up a test FASTDB environment on your local machine.  You'll need to have some form of docker installed, with a new enough version of ``docker compose``.  Rob is able to get things to work with Docker 20.10.24 (run ``docker --version``) and docker compose 2.36.2 (run ``docker compose version``).  If you have older versions and something doesn't work, try upgrading.  You'll need to have the docker container runtime going; how that works depends on exactly which docker you install.  On a Linux, we rcommend `installing Docker Engline <https://docs.docker.com/engine/install/>`_.  On a Mac, you can also try that, but people have had success with `Docker Desktop <https://www.docker.com/products/docker-desktop>`_.
+
+You can build all the docker images necessary to create a development/test environment by running the following in the top level directory of your git checkout::
 
   docker compose build
-
-Assuming no errors, you should now have built all of the docker images necessary to run the environment.  The first time you run this, it will take a while (several minutes at least).  Subsequent runs will be faster, unless something early in the docker file itself has changed (which does sometimes happen).  If you run it immediately again after you just ran it, it should only take several seconds for it to figure out that everything is up to date.
 
 Once you've successfully built the docker environments, run::
 
@@ -84,9 +76,11 @@ Once you've successfully built the docker environments, run::
 
 (For those of you who know docker compose and are wondering why ``webap`` is not just a prerequisite for ``shell``, the reason is so one can get a debug environment up even when code errors prevent the web application from successfully starting.)
 
+**NOTE**: sometimes some of the services seem to be failing to come up properly.  It's possible that this is happening because the checks in the docker compose file time out too fast.  You may be able to get it to work by just repeating the ``...docker compose up -d ...`` line; the second time around, it's possible everything will work.  If something doesn't work, look at the service that didn't come up, and try ``docker compose logs <service>`` to see if it sheds any light.
+
 When you run these two commands, it will start a number of local servers (containers) on your machine, and will set up all the basic database tables.  You can run ``docker compose ps`` to see what containers are running.  Assuming you're running these commands on the same machine you're sitting at (i.e. you're running them on your laptop or desktop, not on a remote server you've connected to), and that everything worked, then after this you should be able to connect to the FASTDB web application with your browser by going to:
 
-   ``http://localhost:8080``
+   http://localhost:8080
 
 (You can change the port on your local machine from ``8080`` to something else by setting the ``WEBPORT`` environment variable before running ``docker compose``.)  This will give you the interactive web pages; however, the same URL can be used for API calls documented on :ref:`Using FASTDB <usage-docs>`.  Right after bringing it up, you won't be able to do much with it, because there are no FASTDB users configured.  See :ref:`creating-a-persistent-test-user` below.
 
@@ -146,8 +140,18 @@ Installing for tests
   ./configure --with-installdir=$PWD/install \
               --with-smtp-server=mailhog \
               --with-smtp-port=1025
-  make install
 
+If you get an error on the ``./configure`` line, it means one of two things.  Either you've edited the file ``aclocal.m4``, or you've edited the file ``Makefile.am`` in one of the subdirectories.  (Never edit any of the ``Makefile.in`` files, as these are all automatically generated.)  If you have edited one of these files, see :ref:`autoreconf-install` below.  If you haven't, then this is the result of autotools and git not agreeing about how file timestamps should be treated.  Try running::
+
+  touch aclocal.m4 configure
+  find . -name Makefile.am -exec touch \{\} \;
+  find . -name Makefile.in -exec touch \{\} \;
+
+and then redoing the ``./configure`` line.
+
+Once your configure has worked, run::
+
+  make install
 
 .. _autoreconf-install:
 
@@ -170,7 +174,7 @@ Unpacking test data
 
 The tests will not yet run as-is.  Inside the ``tests`` subdirectory, you must run::
 
-  bzip2 -d elasticc2_test_data.tar.bz2
+  tar xvf elasticc2_test_data.tar.bz2
 
 in order create the expected test data on your local machine.  Note that ``bzip2`` is *not* installed inside the docker container, so you need to run this on your host machine.  You only need to do this once in your checkout; you do *not* have to do this every time you create a new set of docker containers.  (If the subdirectory ``tests/elasticc2_test_data`` has stuff in it, then you've probably already done this.)
 
@@ -188,8 +192,9 @@ This will completely tear down the environment.  All containers will be stopped,
 Running the tests
 -----------------
 
-Once inside the container, cd into the ``tests`` directory (if you're not there already) and run::
+Once inside the container::
 
+  cd /code/tests
   pytest -v
 
 that will run all of the tests and tell you how they're doing.  As usually with ``pytest``, you can give filenames (and functions or classes/methods within those files) to just run some tests.
@@ -231,9 +236,9 @@ or run::
 
 Both of these start tests with test fixtures that create a database user and load data into the database.  The ``--trace`` command tells pytest to stop at the begining of a test, after the fixture has run.  The shell where you run this will dump you into a ``(Pdb)`` prompt.  Just leave that shell sitting there.  At this point, you have a loaded database.  You can look at ``localhost:8080`` in your web browser to see the web ap, and log in with user ``test`` and password ``test_password``.
 
-The ``test_object_search`` command takes about 10 seconds to run, and loads up the main postgres tables with the test data.  It does *not* load anyting into the mongo database.  The ``test_import_30days_60days`` command takes up to a minute to run, because what it's really doing is testing a whole bunhch of different servers, an there are built in sleeps so that each step of the test can be sure that other servers have had time to do their stuff.  This one loads the full test data set into the "ppdb" tables, and runs a 90 simulated days of alerts through some test brokers.  When it's done, the sources from those 90 simulated days will be in the main postgrest ables, and the mongo database will be populated with  the test broker messages.  (The test brokers aren't doing anything real, but are just assigning random classifications for purposes of testing the plubming.)
+The ``test_object_search`` command takes about 10 seconds to run, and loads up the main postgres tables with the test data.  It does *not* load anyting into the mongo database.  The ``test_import_30days_60days`` command takes up to a minute to run, because what it's really doing is testing a whole bunch of different servers, an there are built in sleeps so that each step of the test can be sure that other servers have had time to do their stuff.  This one loads the full test data set into the "ppdb" tables, and runs a 90 simulated days of alerts through some test brokers.  When it's done, the sources from those 90 simulated days will be in the main postgrest ables, and the mongo database will be populated with  the test broker messages.  (The test brokers aren't doing anything real, but are just assigning random classifications for purposes of testing the plubming.)
 
-When you're done futzing around with the web ap, go to the shee where you ran ``pytest ...`` and just press ``c`` and hit Enter at the ``(Pdb)`` prompt.  The test will compete, exit, and (ideally) clean up after itself.
+When you're done futzing around with the web ap, go to the shell where you ran ``pytest ...`` and just press ``c`` and hit Enter at the ``(Pdb)`` prompt.  The test will compete, exit, and (ideally) clean up after itself.
 
 If you edit the web ap software and what to see the changes, you need to do a couple of things to see the changes.  First, you need to re-install the code.  On a shell inside the container (a different one from the one where your ``(Pdb)`` prompt is sitting), do ``cd /code`` and ``make install``.  (If you've added files, not just edited them, there is more to do; ROB TODO document this.)   Second, you need to get a shell on the webap.  Outside any container, in the ``tests`` directory, run ``docker compose exec -it webap /bin/bash``.  On the shell inside the webap container, run::
 
@@ -260,6 +265,8 @@ Note for Rob: Installing on Perlmutter
 
 rknop_dev environment
 ---------------------
+
+(This is a note for Rob about running a test environment on NERSC Spin.)
 
 The base installation directory is::
 

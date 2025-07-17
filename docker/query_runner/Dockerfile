@@ -4,7 +4,7 @@
 # Rob, use:
 # DOCKER_BUILDKIT=1 docker build --target queryrunner -t registry.nersc.gov/m1727/raknop/fastdb-query-runner:rknop-dev .
 
-FROM rknop/devuan-daedalus-rknop AS base
+FROM debian:bookworm-20250630 AS base
 LABEL maintainer="Rob Knop <rknop@pobox.com>"
 
 SHELL ["/bin/bash", "-c"]
@@ -29,7 +29,7 @@ FROM base AS build
 RUN DEBIAN_FRONTEND="noninteractive" TZ="UTC" \
     apt-get update \
     && DEBIAN_FRONTEND="noninteractive" TZ="UTC" \
-    apt-get -y install -y python3-pip python3-venv git libpq-dev
+    apt-get -y install -y python3-pip python3-venv git libpq-dev ca-certificates
 
 RUN mkdir /venv
 RUN python3 -mvenv /venv
