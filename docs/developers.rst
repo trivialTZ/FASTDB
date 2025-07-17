@@ -69,7 +69,7 @@ First, you need to figure out your architecture.  If it's not ``x86_64`` or ``aa
 
    Linux rosalind 6.12.30+bpo-amd64 #1 SMP PREEMPT_DYNAMIC Debian 6.12.30-1~bpo12+1 (2025-06-14) x86_64 GNU/Linux
 
-In this case, the architecture is ``x86_64``; it shows up as the penultimate word on the line.  You will use this architecure repreatedly.  If you run::
+In this case, the architecture is ``x86_64``; it shows up as the penultimate word on the line.  It won't always show up exactly there, however.  Look for the words ``x86_64``, ``aarch64``, or ``arm64`` somewhere in that string, probably near the end.  If you see either ``aarch64`` or ``arm64``, then your architecture is ``aarch64``.  You will use this architecure repreatedly.  If you run::
 
   export ARCH=<architecture>
 
