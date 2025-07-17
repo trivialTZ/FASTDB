@@ -4,6 +4,7 @@ import pytest
 import pathlib
 import datetime
 import subprocess
+import uuid
 
 from pymongo import MongoClient
 
@@ -424,3 +425,38 @@ def mongoclient_rw():
     password = os.getenv( "MONGODB_ALERT_WRITER_PASSWD" )
     client = MongoClient( f"mongodb://{user}:{password}@{host}:27017/{dbname}?authSource={dbname}" )
     return client
+
+########## FASTDB isolation utilities for loader tests ##########
+_FASTDB_MAIN_TABLES = [
+    'diaobject_snapshot', 'diasource_snapshot', 'diaforcedsource_snapshot',
+    'diasource', 'diaforcedsource', 'diaobject', 'host_galaxy',
+]
+
+def _truncate_fastdb_main_tables():
+    """Dangerous: clears main FASTDB tables. Use only in isolation fixture."""
+    with DB() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            "TRUNCATE TABLE "
+            + ", ".join(_FASTDB_MAIN_TABLES)
+            + " RESTART IDENTITY CASCADE"
+        )
+        conn.commit()
+
+@pytest.fixture
+def fastdb_isolated():
+    """
+    Provide a clean FASTDB main-table sandbox just for a test.
+
+    Yields (pv_name, ss_name) that are guaranteed-unique per use.
+    All FASTDB main tables are truncated before and after the test.
+    """
+    _truncate_fastdb_main_tables()
+
+    pv_name = f"test_procver_{uuid.uuid4().hex[:8]}"
+    ss_name = f"test_snapshot_{uuid.uuid4().hex[:8]}"
+
+    yield pv_name, ss_name
+
+    _truncate_fastdb_main_tables()
+########## end of FASTDB isolation utilities for loader tests ##########
