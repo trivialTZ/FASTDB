@@ -1,8 +1,6 @@
 # This is the Dockerfile for the throwaway kafka server used in tests
 
-ARG ARCH=x86_64
-
-FROM rknop/devuan-daedalus-rknop-$ARCH
+FROM debian:bookworm-20250630
 LABEL maintainenr="Rob Knop <raknop@lbl.gov>"
 
 SHELL ["/bin/bash", "-c"]

@@ -1,13 +1,6 @@
-# FROM rknop/devuan-daedalus-rknop-$ARCH AS base
-# LABEL maintainer="Rob Knop <raknop@lbl.gov>"
-
 FROM mongo:8.0.11 AS BASE
 
 SHELL ["/bin/bash", "-c"]
-
-ARG ARCH=x86-64
-ENV ARCH=$ARCH
-
 WORKDIR /usr/src
 
 # Base System

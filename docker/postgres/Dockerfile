@@ -5,9 +5,7 @@
 #   DOCKER_BUILDKIT=1 docker build --target postgres -t registry.nersc.gov/m1727/raknop/fastdb-postgres:rknop-dev .
 #
 
-ARG ARCH=x86_64
-
-FROM rknop/devuan-daedalus-rknop-$ARCH AS base
+FROM debian:bookworm-20250630 AS base
 LABEL maintainer="Rob Knop <raknop@lbl.gov>"
 
 SHELL ["/bin/bash", "-c"]
