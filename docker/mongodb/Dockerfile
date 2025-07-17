@@ -5,7 +5,8 @@ LABEL maintainer="Rob Knop <raknop@lbl.gov>"
 
 SHELL ["/bin/bash", "-c"]
 
-ENV ARCH=${ARCH}
+ARG ARCH=x86-64
+ENV ARCH=$ARCH
 
 WORKDIR /usr/src
 
