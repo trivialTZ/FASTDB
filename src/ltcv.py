@@ -239,7 +239,7 @@ def object_search( processing_version, return_format='json', **kwargs ):
         mint_firstdet = util.mjd_or_none_from_dict_mjd_or_timestring( kwargs, 'mint_firstdetection' )
         maxt_firstdet = util.mjd_or_none_from_dict_mjd_or_timestring( kwargs, 'maxt_firstdetection' )
         mint_lastdet = util.mjd_or_none_from_dict_mjd_or_timestring( kwargs, 'mint_lastdetection' )
-        maxt_lastdet = util.mjd_or_none_from_dict_mjd_or_timestring( kwargs, 'mint_lastdetection' )
+        maxt_lastdet = util.mjd_or_none_from_dict_mjd_or_timestring( kwargs, 'maxt_lastdetection' )
         if any( i is not None for i in [ mint_firstdet, maxt_firstdet, mint_lastdet, maxt_lastdet ] ):
             raise NotImplementedError( "Filtering by detection times not yet implemented" )
 
