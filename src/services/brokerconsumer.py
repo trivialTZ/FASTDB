@@ -478,7 +478,6 @@ class LigoVirgoKagraConsumer(BrokerConsumer):
             "sasl.mechanism": "SCRAM-SHA-512",
             "sasl.username": username,
             "sasl.password": passwd,
-            "ssl.ca.location": str(_rundir / "cacert.pem"),
             "auto.offset.reset": "earliest",
         }
         super().__init__(

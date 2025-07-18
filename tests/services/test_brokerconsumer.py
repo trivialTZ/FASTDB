@@ -141,7 +141,7 @@ def test_LigoVirgoKagraConsumer(barf, mongoclient, mongoclient_rw):
     brokertopic = "igwn.gwalert"
     collection = f"fastdb_{barf}"
 
-    # Create temporary files with username and password
+    # create temporary files with username and password
     with tempfile.NamedTemporaryFile("w", delete=False) as usernamefile:
         usernamefile.write(username + "\n")
         username_path = usernamefile.name
