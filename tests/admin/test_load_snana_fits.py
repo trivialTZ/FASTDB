@@ -79,3 +79,4 @@ def test_load_snana_fits_ppdb( snana_fits_ppdb_loaded ):
                      'diaforcedsource', 'diaforcedsource_snapshot' ]:
             cursor.execute( f"SELECT COUNT(*) FROM {tab}" )
             assert cursor.fetchone()[0] == 0
+            

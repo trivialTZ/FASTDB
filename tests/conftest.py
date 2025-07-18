@@ -4,7 +4,6 @@ import pytest
 import pathlib
 import datetime
 import subprocess
-import uuid
 
 from pymongo import MongoClient
 
